@@ -11,11 +11,11 @@ class AppRouter {
       RouteSettings settings,
       WidgetRef ref,
       ) {
-    final authState = ref.read(authNotifierProvider);
+    final authState = ref.read(authProvider);
 
     switch (settings.name) {
       case '/login':
-        if (authState.isAuthenticated) {
+        if (authState.user != null) {
           return _page(const DashboardPage());
         }
         return _page(const LoginPage());
@@ -24,7 +24,7 @@ class AppRouter {
         return _page(const RegisterPage());
 
       case '/dashboard':
-        if (!authState.isAuthenticated) {
+        if (authState.user == null) {
           return _page(const LoginPage());
         }
         return _page(const DashboardPage());

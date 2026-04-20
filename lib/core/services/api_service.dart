@@ -1,30 +1,21 @@
-/// ============================================================
-/// AutoPark IUC - Service HTTP (Dio)
-/// ============================================================
-/// Client HTTP centralisé avec intercepteurs pour :
-/// - Ajout automatique du token d'auth
-/// - Gestion des erreurs réseau
-/// - Logging des requêtes
-
 import 'package:dio/dio.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
-import '../../core/constants/api_constants.dart';
-import '../../core/constants/api_endpoints.dart';
+import '../constants/api_constants.dart';
 
-import 'firebase_service.dart';
-
+/// Client HTTP simplifié et robuste
 class ApiService {
   late final Dio _dio;
+  final FirebaseAuth _auth = FirebaseAuth.instance;
 
-  /// Injection du FirebaseAuthService pour récupérer le token.
-  final FirebaseAuthService _firebaseAuthService;
-
-  ApiService(this._firebaseAuthService) {
+  ApiService() {
     _dio = Dio(
       BaseOptions(
-        baseUrl: ApiConstants.baseUrl,
-        connectTimeout: ApiConstants.connectTimeout,
-        receiveTimeout: ApiConstants.receiveTimeout,
+        baseUrl: ApiConstants.baseUrl.endsWith('/') 
+            ? ApiConstants.baseUrl 
+            : '${ApiConstants.baseUrl}/',
+        connectTimeout: const Duration(seconds: 10),
+        receiveTimeout: const Duration(seconds: 10),
         headers: {
           'Content-Type': 'application/json',
           'Accept': 'application/json',
@@ -32,77 +23,71 @@ class ApiService {
       ),
     );
 
-    _dio.interceptors.add(_buildAuthInterceptor());
+    // Intercepteur pour le token et les logs
+    _dio.interceptors.add(InterceptorsWrapper(
+      onRequest: (options, handler) async {
+        final user = _auth.currentUser;
+        if (user != null) {
+          final token = await user.getIdToken();
+          options.headers['Authorization'] = 'Bearer $token';
+        }
+        
+        if (kDebugMode) {
+          print('🌐 API Request: ${options.method} ${options.uri}');
+          if (options.data != null) print('📦 Body: ${options.data}');
+        }
+        return handler.next(options);
+      },
+      onResponse: (response, handler) {
+        if (kDebugMode) {
+          print('✅ API Response [${response.statusCode}]: ${response.data}');
+        }
+        return handler.next(response);
+      },
+      onError: (DioException e, handler) {
+        final message = _extractErrorMessage(e);
+        if (kDebugMode) {
+          print('❌ API Error [${e.response?.statusCode}]: $message');
+        }
+        // On renvoie une nouvelle erreur avec le message simplifié
+        return handler.next(e.copyWith(error: message));
+      },
+    ));
+  }
 
-    if (kDebugMode) {
-      _dio.interceptors.add(LogInterceptor(
-        requestBody: true,
-        responseBody: true,
-        error: true,
-      ));
+  // GET
+  Future<Response> get(String path, {Map<String, dynamic>? query}) async {
+    try {
+      return await _dio.get(path, queryParameters: query);
+    } on DioException catch (e) {
+      throw e.error ?? 'Erreur réseau';
     }
   }
 
-  // ─── Intercepteur d'authentification ────────────────────────
-
-  /// Ajoute automatiquement le Bearer token Firebase à chaque requête.
-  InterceptorsWrapper _buildAuthInterceptor() {
-    return InterceptorsWrapper(
-      onRequest: (options, handler) async {
-        // Certaines routes sont publiques (login, register)
-        final isPublicRoute = options.path == ApiEndpoints.login ||
-            options.path == ApiEndpoints.register;
-
-        if (!isPublicRoute) {
-          final token = await _firebaseAuthService.getIdToken();
-          if (token != null) {
-            options.headers['Authorization'] = 'Bearer $token';
-          }
-        }
-
-        handler.next(options);
-      },
-      onError: (error, handler) {
-        debugPrint('[ApiService] Erreur : ${error.message}');
-        handler.next(error);
-      },
-    );
-  }
-
-  // ─── Méthodes HTTP ───────────────────────────────────────────
-
-  Future<Response> post(String path, {Map<String, dynamic>? data}) async {
+  // POST
+  Future<Response> post(String path, {dynamic data}) async {
     try {
       return await _dio.post(path, data: data);
     } on DioException catch (e) {
-      throw _handleDioError(e);
+      throw e.error ?? 'Erreur réseau';
     }
   }
 
-  Future<Response> get(String path) async {
-    try {
-      return await _dio.get(path);
-    } on DioException catch (e) {
-      throw _handleDioError(e);
+  /// Extrait le message d'erreur du backend ou de Dio
+  String _extractErrorMessage(DioException e) {
+    if (e.type == DioExceptionType.connectionError || e.type == DioExceptionType.connectionTimeout) {
+      return 'Impossible de contacter le serveur (Vérifiez votre connexion).';
     }
-  }
-
-  // ─── Gestion des erreurs Dio ─────────────────────────────────
-
-  Exception _handleDioError(DioException e) {
-    if (e.type == DioExceptionType.connectionTimeout ||
-        e.type == DioExceptionType.receiveTimeout ||
-        e.type == DioExceptionType.connectionError) {
-      return Exception(
-          'Impossible de joindre le serveur. Vérifiez votre connexion.');
+    
+    final responseData = e.response?.data;
+    if (responseData is Map && responseData.containsKey('message')) {
+      return responseData['message'];
+    }
+    
+    if (responseData is Map && responseData.containsKey('error')) {
+      return responseData['error'];
     }
 
-    final response = e.response;
-    if (response != null) {
-      final message = response.data?['message'] ?? 'Une erreur est survenue.';
-      return Exception(message);
-    }
-
-    return Exception('Une erreur inattendue est survenue.');
+    return 'Une erreur inattendue est survenue (${e.response?.statusCode ?? '??'})';
   }
 }

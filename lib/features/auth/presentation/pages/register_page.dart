@@ -121,30 +121,28 @@ class _RegisterPageState extends ConsumerState<RegisterPage>
     });
 
     try {
-      final success = await ref
-          .read(authNotifierProvider.notifier)
-          .register(
-        name: _nameController.text.trim(),
-        email: _emailController.text.trim(),
-        password: _passwordController.text,
-        confirmPassword: _confirmPasswordController.text,
-      );
+      await ref.read(authProvider.notifier).register(
+            _nameController.text.trim(),
+            _emailController.text.trim(),
+            _passwordController.text,
+            _confirmPasswordController.text,
+          );
+
+      final authState = ref.read(authProvider);
 
       if (!mounted) return;
 
-      if (success) {
+      if (authState.error == null) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('Compte créé avec succès !'),
+            content: Text('Compte créé avec succès ! Connectez-vous.'),
             backgroundColor: Colors.green,
           ),
         );
-
         Navigator.of(context).pushReplacementNamed('/login');
       } else {
-        final authState = ref.read(authNotifierProvider);
         setState(() {
-          _globalError = authState.errorMessage;
+          _globalError = authState.error;
         });
       }
     } catch (e) {
@@ -162,7 +160,7 @@ class _RegisterPageState extends ConsumerState<RegisterPage>
   // ── UI ──────────────────────────────────────
   @override
   Widget build(BuildContext context) {
-    final authState = ref.watch(authNotifierProvider);
+    final authState = ref.watch(authProvider);
 
     return Scaffold(
       backgroundColor: AppColors.background,
@@ -258,12 +256,19 @@ class _RegisterPageState extends ConsumerState<RegisterPage>
                         ),
                       ),
 
-                      if (_globalError != null ||
-                          authState.errorMessage != null) ...[
+                      if (_globalError != null) ...[
                         const SizedBox(height: 12),
-                        Text(
-                          _globalError ?? authState.errorMessage!,
-                          style: const TextStyle(color: Colors.red),
+                        Container(
+                          padding: const EdgeInsets.all(12),
+                          decoration: BoxDecoration(
+                            color: Colors.red.withOpacity(0.1),
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: Text(
+                            _globalError!,
+                            style: const TextStyle(color: Colors.red),
+                            textAlign: TextAlign.center,
+                          ),
                         ),
                       ],
 

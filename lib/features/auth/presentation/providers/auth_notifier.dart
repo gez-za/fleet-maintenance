@@ -1,168 +1,106 @@
-/// ============================================================
-/// AutoPark IUC - AuthNotifier (Riverpod)
-/// ============================================================
-/// Gère l'état d'authentification global de l'application.
-/// Expose : AuthState → { loading, user, error }
-/// Utilisé par toutes les pages pour réagir à l'état auth.
-
-import 'package:firebase_auth/firebase_auth.dart';
+import 'dart:convert';
+import 'package:firebase_auth/firebase_auth.dart' as firebase;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:flutter_riverpod/legacy.dart';
-
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import '../../../../core/constants/api_constants.dart';
+import '../../../../core/constants/api_endpoints.dart';
+import '../../../../core/models/user.dart';
 import '../../../../core/services/api_service.dart';
-import '../../../../core/services/firebase_service.dart';
-import '../../data/repositories/auth_repository_impl.dart';
-import '../../../auth/domain/entities/user_entity.dart';
-import '../../domain/repositories/auth_repository.dart';
 
 // ─── State ────────────────────────────────────────────────────
-
-/// État immutable de l'authentification.
 class AuthState {
   final bool isLoading;
-  final UserEntity? user;
-  final String? errorMessage;
-  final bool isAuthenticated;
+  final User? user;
+  final String? error;
 
-  const AuthState({
-    this.isLoading = false,
-    this.user,
-    this.errorMessage,
-    this.isAuthenticated = false,
-  });
+  AuthState({this.isLoading = false, this.user, this.error});
 
-  const AuthState.initial() : this();
-
-  const AuthState.loading() : this(isLoading: true);
-
-  AuthState.authenticated(UserEntity user)
-      : this(user: user, isAuthenticated: true);
-
-  AuthState.error(String message) : this(errorMessage: message);
-
-  AuthState copyWith({
-    bool? isLoading,
-    UserEntity? user,
-    String? errorMessage,
-    bool? isAuthenticated,
-  }) {
-    return AuthState(
-      isLoading: isLoading ?? this.isLoading,
-      user: user ?? this.user,
-      errorMessage: errorMessage ?? this.errorMessage,
-      isAuthenticated: isAuthenticated ?? this.isAuthenticated,
-    );
-  }
+  // Helper pour vérifier si authentifié
+  bool get isAuthenticated => user != null;
 }
 
 // ─── Providers ────────────────────────────────────────────────
+final apiServiceProvider = Provider((ref) => ApiService());
+final secureStorageProvider = Provider((ref) => const FlutterSecureStorage());
 
-final firebaseAuthServiceProvider = Provider<FirebaseAuthService>((ref) {
-  return FirebaseAuthService();
-});
-
-final apiServiceProvider = Provider<ApiService>((ref) {
-  final firebaseAuthService = ref.watch(firebaseAuthServiceProvider);
-  return ApiService(firebaseAuthService);
-});
-
-final authRepositoryProvider = Provider<AuthRepository>((ref) {
-  return AuthRepositoryImpl(
-    apiService: ref.watch(apiServiceProvider),
-    firebaseAuthService: ref.watch(firebaseAuthServiceProvider),
-  );
-});
-
-final authNotifierProvider =
-StateNotifierProvider<AuthNotifier, AuthState>((ref) {
-  return AuthNotifier(ref.watch(authRepositoryProvider));
+/// Utilisation de NotifierProvider (plus moderne et stable)
+final authProvider = NotifierProvider<AuthNotifier, AuthState>(() {
+  return AuthNotifier();
 });
 
 // ─── Notifier ────────────────────────────────────────────────
+class AuthNotifier extends Notifier<AuthState> {
+  late final ApiService _api;
+  late final FlutterSecureStorage _storage;
+  final _firebase = firebase.FirebaseAuth.instance;
 
-class AuthNotifier extends StateNotifier<AuthState> {
-  final AuthRepository _repository;
-
-  AuthNotifier(this._repository) : super(const AuthState.initial()) {
-    _restoreSession();
+  @override
+  AuthState build() {
+    _api = ref.watch(apiServiceProvider);
+    _storage = ref.watch(secureStorageProvider);
+    
+    // Initialisation asynchrone sans bloquer le build
+    _init();
+    
+    return AuthState();
   }
 
-  // ─── Restauration de session au démarrage ────────────────────
-
-  /// Tente de restaurer la session utilisateur depuis le stockage local.
-  Future<void> _restoreSession() async {
-    state = const AuthState.loading();
+  /// Initialisation : restaurer l'utilisateur s'il existe
+  Future<void> _init() async {
     try {
-      final user = await _repository.getCurrentUser();
-      if (user != null) {
-        state = AuthState.authenticated(user);
-      } else {
-        state = const AuthState.initial();
+      final data = await _storage.read(key: ApiConstants.userDataKey);
+      if (data != null && _firebase.currentUser != null) {
+        state = AuthState(user: User.fromJson(jsonDecode(data)));
       }
-    } catch (_) {
-      state = const AuthState.initial();
+    } catch (e) {
+      // Ignorer l'erreur d'init
     }
   }
 
-  // ─── Register ────────────────────────────────────────────────
-
-  /// Inscrit un nouvel utilisateur.
-  /// En cas de succès, ne connecte PAS automatiquement (l'utilisateur doit login).
-  Future<bool> register({
-    required String name,
-    required String email,
-    required String password,
-    required String confirmPassword,
-  }) async {
-    state = const AuthState.loading();
+  /// Login : Firebase -> Backend -> Local Storage
+  Future<void> login(String email, String password) async {
+    state = AuthState(isLoading: true);
     try {
-      await _repository.register(
-        name: name,
-        email: email,
+      // 1. Firebase Login
+      final cred = await _firebase.signInWithEmailAndPassword(
+        email: email.trim(),
         password: password,
-        confirmPassword: confirmPassword,
       );
-      state = const AuthState.initial();
-      return true;
-    } on FirebaseAuthException catch (e) {
-      state = AuthState.error(FirebaseAuthService.mapFirebaseAuthError(e));
-      return false;
+      
+      final idToken = await cred.user?.getIdToken();
+
+      // 2. Backend Login
+      final response = await _api.post(ApiEndpoints.login, data: {'idToken': idToken});
+      final user = User.fromJson(response.data['data']['user']);
+
+      // 3. Save & Update State
+      await _storage.write(key: ApiConstants.userDataKey, value: jsonEncode(user.toJson()));
+      state = AuthState(user: user);
     } catch (e) {
-      state = AuthState.error(e.toString().replaceFirst('Exception: ', ''));
-      return false;
+      state = AuthState(error: e.toString());
     }
   }
 
-  // ─── Login ───────────────────────────────────────────────────
-
-  /// Connecte l'utilisateur et met à jour l'état global.
-  Future<bool> login({
-    required String email,
-    required String password,
-  }) async {
-    state = const AuthState.loading();
+  /// Register
+  Future<void> register(String name, String email, String password, String confirm) async {
+    state = AuthState(isLoading: true);
     try {
-      final user = await _repository.login(email: email, password: password);
-      state = AuthState.authenticated(user);
-      return true;
-    } on FirebaseAuthException catch (e) {
-      state = AuthState.error(FirebaseAuthService.mapFirebaseAuthError(e));
-      return false;
+      await _api.post(ApiEndpoints.register, data: {
+        'name': name,
+        'email': email.trim(),
+        'password': password,
+        'confirmPassword': confirm,
+      });
+      state = AuthState(); // Retour à l'état initial pour que l'user se loggue
     } catch (e) {
-      state = AuthState.error(e.toString().replaceFirst('Exception: ', ''));
-      return false;
+      state = AuthState(error: e.toString());
     }
   }
 
-  // ─── Logout ──────────────────────────────────────────────────
-
+  /// Logout
   Future<void> logout() async {
-    await _repository.logout();
-    state = const AuthState.initial();
-  }
-
-  /// Efface le message d'erreur (après affichage).
-  void clearError() {
-    state = state.copyWith(errorMessage: null);
+    await _firebase.signOut();
+    await _storage.delete(key: ApiConstants.userDataKey);
+    state = AuthState();
   }
 }

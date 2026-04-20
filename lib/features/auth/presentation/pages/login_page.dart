@@ -15,7 +15,7 @@ import '../validators/app_validators.dart';
 import '../widgets/custom_text_field.dart';
 import '../widgets/header_widget.dart';
 import '../widgets/primary_button.dart';
-import '../widgets/social_button.dart';
+// import '../widgets/social_button.dart'; // Supprimé car inutilisé
 
 class LoginPage extends ConsumerStatefulWidget {
   const LoginPage({super.key});
@@ -111,22 +111,21 @@ class _LoginPageState extends ConsumerState<LoginPage>
     });
 
     try {
-      final success = await ref
-          .read(authNotifierProvider.notifier)
-          .login(
-        email: _emailController.text.trim(),
-        password: _passwordController.text,
-      );
+      await ref.read(authProvider.notifier).login(
+            _emailController.text.trim(),
+            _passwordController.text,
+          );
+
+      final authState = ref.read(authProvider);
 
       if (!mounted) return;
 
-      if (success) {
+      if (authState.user != null) {
         _showSuccessSnackbar();
         Navigator.of(context).pushReplacementNamed('/dashboard');
-      } else {
-        final authState = ref.read(authNotifierProvider);
+      } else if (authState.error != null) {
         setState(() {
-          _globalError = authState.errorMessage;
+          _globalError = authState.error;
         });
       }
     } catch (e) {
@@ -144,7 +143,7 @@ class _LoginPageState extends ConsumerState<LoginPage>
   // ── UI ────────────────────────────────────────────────
   @override
   Widget build(BuildContext context) {
-    final authState = ref.watch(authNotifierProvider);
+    final authState = ref.watch(authProvider);
 
     return Scaffold(
       backgroundColor: AppColors.background,
@@ -214,14 +213,18 @@ class _LoginPageState extends ConsumerState<LoginPage>
                       const SizedBox(height: AppDimensions.space24),
 
                       // ERROR GLOBAL
-                      if (_globalError != null ||
-                          authState.errorMessage != null)
+                      if (_globalError != null)
                         Container(
                           padding: const EdgeInsets.all(12),
-                          color: Colors.red.withOpacity(0.1),
+                          margin: const EdgeInsets.only(bottom: 16),
+                          decoration: BoxDecoration(
+                            color: Colors.red.withOpacity(0.1),
+                            borderRadius: BorderRadius.circular(8),
+                          ),
                           child: Text(
-                            _globalError ?? authState.errorMessage!,
+                            _globalError!,
                             style: const TextStyle(color: Colors.red),
+                            textAlign: TextAlign.center,
                           ),
                         ),
 

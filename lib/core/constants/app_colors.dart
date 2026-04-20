@@ -3,11 +3,12 @@ import 'package:flutter/material.dart';
 /// Palette de couleurs officielle fleet_maintenance
 /// Thème : Vert (principal) · Rouge (erreur/alerte) · Gris (neutre)
 abstract class AppColors {
-  // ── Vert principal ─────────────────────────────────────
+  // ── Vert principal (AutoPark) ───────────────────────────
   static const Color primary         = Color(0xFF1A6B3A); // Vert foncé
   static const Color primaryMid      = Color(0xFF2D8653); // Vert moyen
   static const Color primaryLight    = Color(0xFF4CAF72); // Vert clair
   static const Color primarySurface  = Color(0xFFE8F5EE); // Vert très pâle (fond)
+  static const Color primaryAccent   = Color(0xFF4CAF50); // Vert vif
 
   // ── Dégradés ──────────────────────────────────────────
   static const LinearGradient primaryGradient = LinearGradient(
@@ -27,7 +28,7 @@ abstract class AppColors {
   static const Color danger         = Color(0xFFC0392B);
   static const Color dangerLight    = Color(0xFFFFEBEE);
 
-  // ── Ambre (avertissement) ─────────────────────────────
+  // ── Ambre (avertissement) — Utilisé avec parcimonie ──
   static const Color warning        = Color(0xFFF39C12);
   static const Color warningLight   = Color(0xFFFFF8E1);
 
@@ -36,17 +37,38 @@ abstract class AppColors {
   static const Color textSecondary  = Color(0xFF5D6D7E);
   static const Color textHint       = Color(0xFF95A5A6);
   static const Color border         = Color(0xFFDEE2E6);
-  static const Color surface        = Color(0xFFF8F9FA);
-  static const Color background     = Color(0xFFFFFFFF);
   static const Color divider        = Color(0xFFECF0F1);
 
   // ── Blanc / Noir ──────────────────────────────────────
   static const Color white          = Color(0xFFFFFFFF);
   static const Color black          = Color(0xFF000000);
 
-  // ── Statuts véhicules ─────────────────────────────────
-  static const Color statusAvailable = Color(0xFF27AE60); // Disponible
-  static const Color statusMission   = Color(0xFF2980B9); // En mission
-  static const Color statusPanne     = Color(0xFFE74C3C); // En panne
-  static const Color statusAtelier   = Color(0xFF95A5A6); // En atelier
+  // ── Sidebar ───────────────────────────────────────────────
+  static const Color sidebarBg     = Color(0xFF1C2833); // Gris foncé (textPrimary)
+  static const Color sidebarActive = Color(0xFF1A6B3A); // Vert sélectionné
+  static const Color sidebarText   = Color(0xFF95A5A6); // Texte inactif
+  static const Color sidebarTextActive = Color(0xFFFFFFFF);
+
+  // ── Fond & Surfaces ────────────────────────────────────────
+  static const background    = Color(0xFFF4F6F9); 
+  static const surface       = Color(0xFFFFFFFF); 
+  static const surfaceHover  = Color(0xFFF0F4F8);
+
+  // ── Statuts véhicules ─────────────────────────────────────
+  static const available     = Color(0xFF1A6B3A); // Vert
+  static const unavailable   = Color(0xFFC0392B); // Rouge
+  static const inRepair      = Color(0xFF5D6D7E); // Gris
+  static const inMission     = Color(0xFF2D8653); // Vert moyen
+
+  // ── Graphiques ────────────────────────────────────────────
+  static const chartGreen    = Color(0xFF1A6B3A);
+  static const chartRed      = Color(0xFFC0392B);
+  static const chartGrey     = Color(0xFF5D6D7E);
+  static const chartLightGreen = Color(0xFF4CAF72);
+
+  static BoxShadow get cardShadow => BoxShadow(
+    color:       Colors.black.withOpacity(0.06),
+    blurRadius:  12,
+    offset:      const Offset(0, 4),
+  );
 }
