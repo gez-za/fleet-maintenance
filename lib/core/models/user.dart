@@ -1,77 +1,133 @@
 // ============================================================
-// AutoPark IUC — Modèle utilisateur
+// AutoPark IUC — Modèle utilisateur (Aligné avec Express Backend)
 // ============================================================
 
 import 'dart:convert';
+import 'package:flutter/material.dart';
 
 enum UserRole {
-  admin,
-  chauffeur,
-  technicien,
-  directeur,
-  chefChauffeur,
-  responsableAtelier;
+  ADMIN,
+  DIRECTEUR,
+  CHEF_ATELIER,
+  TECHNICIEN,
+  CHAUFFEUR;
 
   static UserRole fromString(String value) {
-    const map = {
-      'admin':               UserRole.admin,
-      'chauffeur':           UserRole.chauffeur,
-      'technicien':          UserRole.technicien,
-      'directeur':           UserRole.directeur,
-      'chef_chauffeur':      UserRole.chefChauffeur,
-      'responsable_atelier': UserRole.responsableAtelier,
-    };
-    return map[value] ?? UserRole.chauffeur;
+    return UserRole.values.firstWhere(
+      (e) => e.name == value.toUpperCase(),
+      orElse: () => UserRole.CHAUFFEUR,
+    );
   }
 
   String get label => switch (this) {
-    UserRole.admin              => 'Administrateur',
-    UserRole.chauffeur          => 'Chauffeur',
-    UserRole.technicien         => 'Technicien',
-    UserRole.directeur          => 'Directeur',
-    UserRole.chefChauffeur      => 'Chef Chauffeur',
-    UserRole.responsableAtelier => 'Responsable Atelier',
+    UserRole.ADMIN         => 'Administrateur',
+    UserRole.CHAUFFEUR     => 'Chauffeur',
+    UserRole.TECHNICIEN    => 'Technicien',
+    UserRole.DIRECTEUR     => 'Directeur',
+    UserRole.CHEF_ATELIER  => 'Chef d\'Atelier',
   };
 
-  bool get isAdmin => this == UserRole.admin;
+  bool get isAdmin => this == UserRole.ADMIN;
+
+  IconData get icon => switch (this) {
+    UserRole.ADMIN         => Icons.admin_panel_settings_outlined,
+    UserRole.CHAUFFEUR     => Icons.directions_car_outlined,
+    UserRole.TECHNICIEN    => Icons.build_outlined,
+    UserRole.DIRECTEUR     => Icons.person_pin_outlined,
+    UserRole.CHEF_ATELIER  => Icons.engineering_outlined,
+  };
+}
+
+class UserProfile {
+  final String id;
+  final String nom;
+  final String prenom;
+  final String? telephone;
+  final String? adresse;
+  final String? photoUrl;
+
+  const UserProfile({
+    required this.id,
+    required this.nom,
+    required this.prenom,
+    this.telephone,
+    this.adresse,
+    this.photoUrl,
+  });
+
+  factory UserProfile.fromJson(Map<String, dynamic> json) => UserProfile(
+    id: json['id'] as String,
+    nom: json['nom'] as String? ?? '',
+    prenom: json['prenom'] as String? ?? '',
+    telephone: json['telephone'] as String?,
+    adresse: json['adresse'] as String?,
+    photoUrl: (json['photo_url'] ?? json['photoUrl']) as String?,
+  );
+
+  Map<String, dynamic> toJson() => {
+    'id': id,
+    'nom': nom,
+    'prenom': prenom,
+    if (telephone != null) 'telephone': telephone,
+    if (adresse != null) 'adresse': adresse,
+    if (photoUrl != null) 'photo_url': photoUrl,
+  };
 }
 
 class User {
-  final String   uid;
-  final String   name;
-  final String   email;
+  final String uuid;
+  final String name;
+  final String email;
   final UserRole role;
-  final String?  photoUrl; // Optionnel — avatar profil
+  final bool isActive;
+  final UserProfile? profile;
+  final Map<String, dynamic>? roleInfo; // Pour les infos spécifiques (matricule, permis, etc.)
 
   const User({
-    required this.uid,
+    required this.uuid,
     required this.name,
     required this.email,
     required this.role,
-    this.photoUrl,
+    this.isActive = true,
+    this.profile,
+    this.roleInfo,
   });
 
   bool get isAdmin => role.isAdmin;
 
+  bool get isProfileComplete {
+    final p = profile;
+    if (p == null) return false;
+    // On considère complet si le téléphone et l'adresse sont remplis
+    return p.telephone != null && p.telephone!.isNotEmpty &&
+           p.adresse != null && p.adresse!.isNotEmpty;
+  }
+
   factory User.fromJson(Map<String, dynamic> json) => User(
-    uid:      json['uid']      as String,
-    name:     json['name']     as String,
-    email:    json['email']    as String,
-    role:     UserRole.fromString(json['role'] as String? ?? 'chauffeur'),
-    photoUrl: json['photoUrl'] as String?,
+    uuid: json['uuid'] as String,
+    name: json['name'] as String? ?? '',
+    email: json['email'] as String,
+    role: UserRole.fromString(json['role'] as String? ?? 'CHAUFFEUR'),
+    isActive: json['is_active'] as bool? ?? true,
+    profile: json['profile'] != null 
+        ? UserProfile.fromJson(json['profile'] as Map<String, dynamic>) 
+        : null,
+    roleInfo: json['role_info'] as Map<String, dynamic>?,
   );
 
   Map<String, dynamic> toJson() => {
-    'uid':      uid,
-    'name':     name,
-    'email':    email,
-    'role':     role.name,
-    if (photoUrl != null) 'photoUrl': photoUrl,
+    'uuid': uuid,
+    'name': name,
+    'email': email,
+    'role': role.name,
+    'is_active': isActive,
+    if (profile != null) 'profile': profile!.toJson(),
+    if (roleInfo != null) 'role_info': roleInfo,
   };
 
-  String toStorageString()                   => jsonEncode(toJson());
+  String toStorageString() => jsonEncode(toJson());
   static User fromStorageString(String s) => User.fromJson(jsonDecode(s));
 
   @override
-  String toString() => 'AppUser($email | ${role.label})';
+  String toString() => 'User($email | ${role.label})';
 }

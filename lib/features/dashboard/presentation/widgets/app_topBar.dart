@@ -7,6 +7,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/models/user.dart';
 import '../../../auth/presentation/providers/auth_notifier.dart';
+import '../../../../core/widgets/user_avatar.dart';
 
 class AppTopBar extends ConsumerWidget implements PreferredSizeWidget {
   final String       pageTitle;
@@ -50,8 +51,11 @@ class AppTopBar extends ConsumerWidget implements PreferredSizeWidget {
         ],
 
         _NotificationBell(),
-        const SizedBox(width: 8),
-        _TopBarAvatar(user: user),
+        const SizedBox(width: 12),
+        GestureDetector(
+          onTap: () => Navigator.of(context).pushNamed('/profile'),
+          child: UserAvatar(user: user, radius: 18),
+        ),
       ]),
     );
   }
@@ -102,30 +106,5 @@ class _NotificationBell extends StatelessWidget {
         ),
       ),
     ]);
-  }
-}
-
-class _TopBarAvatar extends StatelessWidget {
-  final User? user;
-  const _TopBarAvatar({required this.user});
-
-  @override
-  Widget build(BuildContext context) {
-    final initial  = user?.name.isNotEmpty == true ? user!.name[0].toUpperCase() : '?';
-    final photoUrl = user?.photoUrl;
-
-    return Tooltip(
-      message: user?.name ?? '',
-      child: photoUrl != null && photoUrl.isNotEmpty
-          ? CircleAvatar(radius: 18, backgroundImage: NetworkImage(photoUrl))
-          : CircleAvatar(
-        radius:          18,
-        backgroundColor: AppColors.primary,
-        child: Text(initial,
-            style: const TextStyle(
-              color: Colors.white, fontSize: 14, fontWeight: FontWeight.w700,
-            )),
-      ),
-    );
   }
 }

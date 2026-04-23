@@ -1,12 +1,12 @@
 import 'package:dio/dio.dart';
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import '../constants/api_constants.dart';
 
-/// Client HTTP simplifié et robuste
+/// Client HTTP simplifié et robuste pour l'API Express
 class ApiService {
   late final Dio _dio;
-  final FirebaseAuth _auth = FirebaseAuth.instance;
+  final FlutterSecureStorage _storage = const FlutterSecureStorage();
 
   ApiService() {
     _dio = Dio(
@@ -14,8 +14,8 @@ class ApiService {
         baseUrl: ApiConstants.baseUrl.endsWith('/') 
             ? ApiConstants.baseUrl 
             : '${ApiConstants.baseUrl}/',
-        connectTimeout: const Duration(seconds: 10),
-        receiveTimeout: const Duration(seconds: 10),
+        connectTimeout: ApiConstants.connectTimeout,
+        receiveTimeout: ApiConstants.receiveTimeout,
         headers: {
           'Content-Type': 'application/json',
           'Accept': 'application/json',
@@ -23,12 +23,11 @@ class ApiService {
       ),
     );
 
-    // Intercepteur pour le token et les logs
+    // Intercepteur pour le token JWT et les logs
     _dio.interceptors.add(InterceptorsWrapper(
       onRequest: (options, handler) async {
-        final user = _auth.currentUser;
-        if (user != null) {
-          final token = await user.getIdToken();
+        final token = await _storage.read(key: 'jwt_token');
+        if (token != null) {
           options.headers['Authorization'] = 'Bearer $token';
         }
         
@@ -49,7 +48,6 @@ class ApiService {
         if (kDebugMode) {
           print('❌ API Error [${e.response?.statusCode}]: $message');
         }
-        // On renvoie une nouvelle erreur avec le message simplifié
         return handler.next(e.copyWith(error: message));
       },
     ));
@@ -73,7 +71,16 @@ class ApiService {
     }
   }
 
-  /// Extrait le message d'erreur du backend ou de Dio
+  // PUT
+  Future<Response> put(String path, {dynamic data}) async {
+    try {
+      return await _dio.put(path, data: data);
+    } on DioException catch (e) {
+      throw e.error ?? 'Erreur réseau';
+    }
+  }
+
+  /// Extrait le message d'erreur du backend
   String _extractErrorMessage(DioException e) {
     if (e.type == DioExceptionType.connectionError || e.type == DioExceptionType.connectionTimeout) {
       return 'Impossible de contacter le serveur (Vérifiez votre connexion).';
@@ -82,10 +89,6 @@ class ApiService {
     final responseData = e.response?.data;
     if (responseData is Map && responseData.containsKey('message')) {
       return responseData['message'];
-    }
-    
-    if (responseData is Map && responseData.containsKey('error')) {
-      return responseData['error'];
     }
 
     return 'Une erreur inattendue est survenue (${e.response?.statusCode ?? '??'})';

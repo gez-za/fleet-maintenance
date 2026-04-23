@@ -122,7 +122,11 @@ class _LoginPageState extends ConsumerState<LoginPage>
 
       if (authState.user != null) {
         _showSuccessSnackbar();
-        Navigator.of(context).pushReplacementNamed('/dashboard');
+        if (authState.user?.profile == null) {
+          Navigator.of(context).pushReplacementNamed('/profile-setup');
+        } else {
+          Navigator.of(context).pushReplacementNamed('/dashboard');
+        }
       } else if (authState.error != null) {
         setState(() {
           _globalError = authState.error;

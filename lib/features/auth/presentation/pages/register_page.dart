@@ -135,11 +135,16 @@ class _RegisterPageState extends ConsumerState<RegisterPage>
       if (authState.error == null) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('Compte créé avec succès ! Connectez-vous.'),
+            content: Text('Compte créé avec succès !'),
             backgroundColor: Colors.green,
           ),
         );
-        Navigator.of(context).pushReplacementNamed('/login');
+        
+        if (authState.needsProfile) {
+          Navigator.of(context).pushReplacementNamed('/profile-setup');
+        } else {
+          Navigator.of(context).pushReplacementNamed('/dashboard');
+        }
       } else {
         setState(() {
           _globalError = authState.error;

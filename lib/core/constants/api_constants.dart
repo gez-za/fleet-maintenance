@@ -19,20 +19,27 @@ class ApiConstants {
     // if (kReleaseMode) return 'https://api.autopark-iuc.cm/api/v1';
 
     if (kIsWeb) {
-      // Flutter Web tourne dans le navigateur (localhost:PORT_DYNAMIQUE).
-      // Utiliser '127.0.0.1' est plus robuste que 'localhost' sur certains systèmes.
-      // ✅ Le backend doit écouter sur 0.0.0.0 (pas seulement 127.0.0.1)
       return 'http://127.0.0.1:5000/api/v1/';
     }
 
-    // Android émulateur → 10.0.2.2 est l'alias vers localhost de la machine hôte
     if (defaultTargetPlatform == TargetPlatform.android) {
       return 'http://10.0.2.2:5000/api/v1/';
     }
 
-    // iOS simulateur / Android physique / iOS physique sur réseau LAN
-    // Remplace par l'IP de ta machine sur le réseau local
     return 'http://192.168.1.118:5000/api/v1/';
+  }
+
+  static String get uploadUrl {
+    return baseUrl.replaceAll('/api/v1/', '/');
+  }
+
+  static String? getFullImageUrl(String? path) {
+    if (path == null || path.isEmpty) return null;
+    if (path.startsWith('http')) return path;
+    
+    // Si le path commence par /, on l'enlève pour éviter le double //
+    final cleanPath = path.startsWith('/') ? path.substring(1) : path;
+    return '${uploadUrl}$cleanPath';
   }
 
   // ─── Timeouts ─────────────────────────────────────────────────

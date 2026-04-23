@@ -5,7 +5,6 @@
 import 'package:flutter/material.dart';
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/constants/app_dimensions.dart';
-import 'dashboard_widgets.dart'; // Pour réutiliser certains composants si besoin
 import 'map_placeholder.dart';
 import 'performance_line_chart.dart';
 import 'placeholder_tabs.dart'; // Pour StatusDonutChart s'il est là ou ailleurs
