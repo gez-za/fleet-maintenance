@@ -98,15 +98,24 @@ class AuthNotifier extends Notifier<AuthState> {
     }
   }
 
-  /// Register
-  Future<void> register(String name, String email, String password, String confirm) async {
+  /// Register avec les nouveaux champs obligatoires
+  Future<void> register({
+    required String nom,
+    required String prenom,
+    required String email,
+    required String password,
+    required UserRole role,
+    String? telephone,
+  }) async {
     state = state.copyWith(isLoading: true, error: null);
     try {
       final response = await _api.post(ApiEndpoints.register, data: {
-        'name': name,
+        'nom': nom,
+        'prenom': prenom,
         'email': email.trim(),
         'password': password,
-        'confirmPassword': confirm,
+        'role': role.name,
+        'telephone': telephone,
       });
 
       final user = User.fromJson(response.data['data']['user']);
@@ -115,12 +124,13 @@ class AuthNotifier extends Notifier<AuthState> {
       await _storage.write(key: 'jwt_token', value: token);
       await _storage.write(key: ApiConstants.userDataKey, value: jsonEncode(user.toJson()));
 
-      state = state.copyWith(isLoading: false, user: user, needsProfile: true);
+      state = state.copyWith(isLoading: false, user: user, needsProfile: false);
     } catch (e) {
       state = state.copyWith(isLoading: false, error: e.toString());
     }
   }
-/// Update Profile + Role + Role-specific info + Photo
+
+  /// Update Profile + Role + Role-specific info + Photo
   Future<void> updateProfile({
     required String nom,
     required String prenom,
@@ -181,11 +191,11 @@ class AuthNotifier extends Notifier<AuthState> {
         });
       }
 
-      // 🔹 Appel API
-      final response = await _api.put('profile', data: payload);
+      // 🔹 Appel API vers le nouvel endpoint explicit
+      final response = await _api.put(ApiEndpoints.profiles, data: payload);
       final responseData = response.data['data'];
 
-      // ⚠️ Sécurisation parsing (sans changer logique)
+      // ⚠️ Sécurisation parsing (le backend renvoie l'objet profile mis à jour)
       final updatedProfile = UserProfile.fromJson(
         responseData['profile'] ?? responseData,
       );
@@ -200,7 +210,6 @@ class AuthNotifier extends Notifier<AuthState> {
       if (state.user != null) {
         final updatedUser = User(
           uuid: state.user!.uuid,
-          name: state.user!.name,
           email: state.user!.email,
           role: updatedRole,
           isActive: state.user!.isActive,

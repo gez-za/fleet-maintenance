@@ -103,12 +103,7 @@ class AppSidebar extends ConsumerWidget {
   }
 
   Widget _buildUserProfile(BuildContext context, WidgetRef ref, User? user) {
-    final profile = user?.profile;
-    String displayName = user?.name ?? 'Utilisateur';
-    
-    if (profile != null) {
-      displayName = '${profile.prenom} ${profile.nom}'.trim();
-    }
+    final displayName = user?.displayName ?? 'Utilisateur';
 
     return GestureDetector(
       onTap: () {

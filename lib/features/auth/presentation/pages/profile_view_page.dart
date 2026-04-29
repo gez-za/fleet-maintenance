@@ -14,7 +14,7 @@ class ProfileViewPage extends ConsumerWidget {
     if (user == null) return const Scaffold(body: Center(child: CircularProgressIndicator()));
 
     final profile = user.profile;
-    final displayName = profile != null ? '${profile.prenom} ${profile.nom}'.trim() : user.name;
+    final displayName = user.displayName;
 
     return Scaffold(
       backgroundColor: const Color(0xFFF4F7FA),

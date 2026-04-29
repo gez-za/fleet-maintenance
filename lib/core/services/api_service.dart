@@ -11,8 +11,8 @@ class ApiService {
   ApiService() {
     _dio = Dio(
       BaseOptions(
-        baseUrl: ApiConstants.baseUrl.endsWith('/') 
-            ? ApiConstants.baseUrl 
+        baseUrl: ApiConstants.baseUrl.endsWith('/')
+            ? ApiConstants.baseUrl
             : '${ApiConstants.baseUrl}/',
         connectTimeout: ApiConstants.connectTimeout,
         receiveTimeout: ApiConstants.receiveTimeout,
@@ -23,14 +23,13 @@ class ApiService {
       ),
     );
 
-    // Intercepteur pour le token JWT et les logs
+    // Intercepteur JWT + logs debug
     _dio.interceptors.add(InterceptorsWrapper(
       onRequest: (options, handler) async {
         final token = await _storage.read(key: 'jwt_token');
         if (token != null) {
           options.headers['Authorization'] = 'Bearer $token';
         }
-        
         if (kDebugMode) {
           print('🌐 API Request: ${options.method} ${options.uri}');
           if (options.data != null) print('📦 Body: ${options.data}');
@@ -53,7 +52,8 @@ class ApiService {
     ));
   }
 
-  // GET
+  // ── GET ───────────────────────────────────────────────────────────────────
+
   Future<Response> get(String path, {Map<String, dynamic>? query}) async {
     try {
       return await _dio.get(path, queryParameters: query);
@@ -62,7 +62,8 @@ class ApiService {
     }
   }
 
-  // POST
+  // ── POST ──────────────────────────────────────────────────────────────────
+
   Future<Response> post(String path, {dynamic data}) async {
     try {
       return await _dio.post(path, data: data);
@@ -71,7 +72,8 @@ class ApiService {
     }
   }
 
-  // PUT
+  // ── PUT ───────────────────────────────────────────────────────────────────
+
   Future<Response> put(String path, {dynamic data}) async {
     try {
       return await _dio.put(path, data: data);
@@ -80,15 +82,36 @@ class ApiService {
     }
   }
 
-  /// Extrait le message d'erreur du backend
+  // ── DELETE ────────────────────────────────────────────────────────────────
+
+  Future<Response> delete(String path, {dynamic data}) async {
+    try {
+      return await _dio.delete(path, data: data);
+    } on DioException catch (e) {
+      throw e.error ?? 'Erreur réseau';
+    }
+  }
+
+  // ── Extraction du message d'erreur backend ────────────────────────────────
+
   String _extractErrorMessage(DioException e) {
-    if (e.type == DioExceptionType.connectionError || e.type == DioExceptionType.connectionTimeout) {
+    if (e.type == DioExceptionType.connectionError ||
+        e.type == DioExceptionType.connectionTimeout) {
       return 'Impossible de contacter le serveur (Vérifiez votre connexion).';
     }
-    
+
     final responseData = e.response?.data;
-    if (responseData is Map && responseData.containsKey('message')) {
-      return responseData['message'];
+    if (responseData is Map) {
+      if (responseData.containsKey('errors') &&
+          responseData['errors'] is List) {
+        final List errors = responseData['errors'];
+        if (errors.isNotEmpty) {
+          return '${responseData['message'] ?? 'Erreur'}: ${errors.join(", ")}';
+        }
+      }
+      if (responseData.containsKey('message')) {
+        return responseData['message'];
+      }
     }
 
     return 'Une erreur inattendue est survenue (${e.response?.statusCode ?? '??'})';

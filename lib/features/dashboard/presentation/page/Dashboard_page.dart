@@ -1,3 +1,4 @@
+import 'package:fleet_maintenance_app/features/vehicles/presentation/pages/vehicle_list_page.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -25,7 +26,7 @@ class _DashboardPageState extends ConsumerState<DashboardPage> {
   ];
 
   static const _tabs = <Widget>[
-    HomeTab(),         VehiclesTab(),     PannesTab(),
+    HomeTab(),         VehicleListPage(),     PannesTab(),
     AtelierTab(),      CarburantTab(),    ChauffeursTab(),
     MaterielsTab(),    FournisseursTab(),
   ];

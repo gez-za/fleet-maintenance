@@ -78,8 +78,8 @@ class UserAvatar extends StatelessWidget {
       final first = p.prenom.isNotEmpty ? p.prenom[0].toUpperCase() : '';
       final second = p.nom.isNotEmpty ? p.nom[0].toUpperCase() : '';
       initials = '$first$second'.isNotEmpty ? '$first$second' : '?';
-    } else if (user?.name != null && user!.name.isNotEmpty) {
-      initials = user!.name[0].toUpperCase();
+    } else if (user != null) {
+      initials = user!.displayName.isNotEmpty ? user!.displayName[0].toUpperCase() : '?';
     }
 
     return Text(

@@ -76,7 +76,6 @@ class UserProfile {
 
 class User {
   final String uuid;
-  final String name;
   final String email;
   final UserRole role;
   final bool isActive;
@@ -85,7 +84,6 @@ class User {
 
   const User({
     required this.uuid,
-    required this.name,
     required this.email,
     required this.role,
     this.isActive = true,
@@ -94,6 +92,14 @@ class User {
   });
 
   bool get isAdmin => role.isAdmin;
+
+  String get displayName {
+    if (profile != null) {
+      final fullName = '${profile!.prenom} ${profile!.nom}'.trim();
+      return fullName.isNotEmpty ? fullName : email.split('@')[0];
+    }
+    return email.split('@')[0];
+  }
 
   bool get isProfileComplete {
     final p = profile;
@@ -105,10 +111,9 @@ class User {
 
   factory User.fromJson(Map<String, dynamic> json) => User(
     uuid: json['uuid'] as String,
-    name: json['name'] as String? ?? '',
     email: json['email'] as String,
     role: UserRole.fromString(json['role'] as String? ?? 'CHAUFFEUR'),
-    isActive: json['is_active'] as bool? ?? true,
+    isActive: (json['is_active'] ?? json['isActive']) as bool? ?? true,
     profile: json['profile'] != null 
         ? UserProfile.fromJson(json['profile'] as Map<String, dynamic>) 
         : null,
@@ -117,7 +122,6 @@ class User {
 
   Map<String, dynamic> toJson() => {
     'uuid': uuid,
-    'name': name,
     'email': email,
     'role': role.name,
     'is_active': isActive,

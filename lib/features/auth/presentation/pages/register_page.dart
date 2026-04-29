@@ -9,6 +9,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/constants/app_dimensions.dart';
 import '../../../../core/constants/auth/register/app_strings.dart';
+import '../../../../core/models/user.dart';
 
 import '../providers/auth_notifier.dart';
 import '../validators/app_validators.dart';
@@ -30,19 +31,24 @@ class _RegisterPageState extends ConsumerState<RegisterPage>
 
   // ── Controllers ─────────────────────────────
   final _formKey = GlobalKey<FormState>();
-  final _nameController = TextEditingController();
+  final _nomController = TextEditingController();
+  final _prenomController = TextEditingController();
   final _emailController = TextEditingController();
+  final _phoneController = TextEditingController();
   final _passwordController = TextEditingController();
   final _confirmPasswordController = TextEditingController();
 
-  final _nameFocus = FocusNode();
+  final _nomFocus = FocusNode();
+  final _prenomFocus = FocusNode();
   final _emailFocus = FocusNode();
+  final _phoneFocus = FocusNode();
   final _passwordFocus = FocusNode();
   final _confirmPasswordFocus = FocusNode();
 
   // ── States ──────────────────────────────────
   bool _isLoading = false;
   String? _globalError;
+  UserRole _selectedRole = UserRole.CHAUFFEUR;
 
   // ── Animations ─────────────────────────────
   late AnimationController _animController;
@@ -61,8 +67,9 @@ class _RegisterPageState extends ConsumerState<RegisterPage>
       vsync: this,
     );
 
-    _slideAnimations = List.generate(6, (i) {
-      final start = (i * 0.1).clamp(0.0, 0.7);
+    const totalAnimatedWidgets = 9;
+    _slideAnimations = List.generate(totalAnimatedWidgets, (i) {
+      final start = (i * 0.08).clamp(0.0, 0.7);
       final end = (start + 0.4).clamp(0.0, 1.0);
 
       return Tween<Offset>(
@@ -76,8 +83,8 @@ class _RegisterPageState extends ConsumerState<RegisterPage>
       );
     });
 
-    _fadeAnimations = List.generate(6, (i) {
-      final start = (i * 0.1).clamp(0.0, 0.7);
+    _fadeAnimations = List.generate(totalAnimatedWidgets, (i) {
+      final start = (i * 0.08).clamp(0.0, 0.7);
       final end = (start + 0.35).clamp(0.0, 1.0);
 
       return Tween<double>(begin: 0, end: 1).animate(
@@ -95,13 +102,17 @@ class _RegisterPageState extends ConsumerState<RegisterPage>
 
   @override
   void dispose() {
-    _nameController.dispose();
+    _nomController.dispose();
+    _prenomController.dispose();
     _emailController.dispose();
+    _phoneController.dispose();
     _passwordController.dispose();
     _confirmPasswordController.dispose();
 
-    _nameFocus.dispose();
+    _nomFocus.dispose();
+    _prenomFocus.dispose();
     _emailFocus.dispose();
+    _phoneFocus.dispose();
     _passwordFocus.dispose();
     _confirmPasswordFocus.dispose();
 
@@ -122,10 +133,12 @@ class _RegisterPageState extends ConsumerState<RegisterPage>
 
     try {
       await ref.read(authProvider.notifier).register(
-            _nameController.text.trim(),
-            _emailController.text.trim(),
-            _passwordController.text,
-            _confirmPasswordController.text,
+            nom: _nomController.text.trim(),
+            prenom: _prenomController.text.trim(),
+            email: _emailController.text.trim(),
+            password: _passwordController.text,
+            role: _selectedRole,
+            telephone: _phoneController.text.trim(),
           );
 
       final authState = ref.read(authProvider);
@@ -140,11 +153,7 @@ class _RegisterPageState extends ConsumerState<RegisterPage>
           ),
         );
         
-        if (authState.needsProfile) {
-          Navigator.of(context).pushReplacementNamed('/profile-setup');
-        } else {
-          Navigator.of(context).pushReplacementNamed('/dashboard');
-        }
+        Navigator.of(context).pushReplacementNamed('/dashboard');
       } else {
         setState(() {
           _globalError = authState.error;
@@ -165,8 +174,6 @@ class _RegisterPageState extends ConsumerState<RegisterPage>
   // ── UI ──────────────────────────────────────
   @override
   Widget build(BuildContext context) {
-    final authState = ref.watch(authProvider);
-
     return Scaffold(
       backgroundColor: AppColors.background,
       body: GestureDetector(
@@ -196,15 +203,34 @@ class _RegisterPageState extends ConsumerState<RegisterPage>
 
                       _buildAnimated(
                         index: 1,
-                        child: CustomTextField(
-                          label: AppStrings.name,
-                          hintText: AppStrings.nameHint,
-                          prefixIcon: Icons.person_outline,
-                          controller: _nameController,
-                          focusNode: _nameFocus,
-                          textInputAction: TextInputAction.next,
-                          onSubmitted: (_) => _emailFocus.requestFocus(),
-                          validator: AppValidators.validateName,
+                        child: Row(
+                          children: [
+                            Expanded(
+                              child: CustomTextField(
+                                label: AppStrings.nom,
+                                hintText: AppStrings.nomHint,
+                                prefixIcon: Icons.person_outline,
+                                controller: _nomController,
+                                focusNode: _nomFocus,
+                                textInputAction: TextInputAction.next,
+                                onSubmitted: (_) => _prenomFocus.requestFocus(),
+                                validator: AppValidators.validateName,
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: CustomTextField(
+                                label: AppStrings.prenom,
+                                hintText: AppStrings.prenomHint,
+                                prefixIcon: Icons.person_outline,
+                                controller: _prenomController,
+                                focusNode: _prenomFocus,
+                                textInputAction: TextInputAction.next,
+                                onSubmitted: (_) => _emailFocus.requestFocus(),
+                                validator: AppValidators.validateName,
+                              ),
+                            ),
+                          ],
                         ),
                       ),
 
@@ -219,7 +245,7 @@ class _RegisterPageState extends ConsumerState<RegisterPage>
                           controller: _emailController,
                           focusNode: _emailFocus,
                           textInputAction: TextInputAction.next,
-                          onSubmitted: (_) => _passwordFocus.requestFocus(),
+                          onSubmitted: (_) => _phoneFocus.requestFocus(),
                           validator: AppValidators.validateEmail,
                         ),
                       ),
@@ -228,6 +254,29 @@ class _RegisterPageState extends ConsumerState<RegisterPage>
 
                       _buildAnimated(
                         index: 3,
+                        child: CustomTextField(
+                          label: AppStrings.telephone,
+                          hintText: AppStrings.telephoneHint,
+                          prefixIcon: Icons.phone_outlined,
+                          controller: _phoneController,
+                          focusNode: _phoneFocus,
+                          keyboardType: TextInputType.phone,
+                          textInputAction: TextInputAction.next,
+                          onSubmitted: (_) => _passwordFocus.requestFocus(),
+                        ),
+                      ),
+
+                      const SizedBox(height: AppDimensions.space20),
+
+                      _buildAnimated(
+                        index: 4,
+                        child: _buildRoleDropdown(),
+                      ),
+
+                      const SizedBox(height: AppDimensions.space20),
+
+                      _buildAnimated(
+                        index: 5,
                         child: CustomTextField(
                           label: AppStrings.password,
                           hintText: AppStrings.passwordHint,
@@ -245,7 +294,7 @@ class _RegisterPageState extends ConsumerState<RegisterPage>
                       const SizedBox(height: AppDimensions.space20),
 
                       _buildAnimated(
-                        index: 4,
+                        index: 6,
                         child: CustomTextField(
                           label: AppStrings.confirmPassword,
                           hintText: AppStrings.passwordHint,
@@ -280,7 +329,7 @@ class _RegisterPageState extends ConsumerState<RegisterPage>
                       const SizedBox(height: AppDimensions.space24),
 
                       _buildAnimated(
-                        index: 5,
+                        index: 7,
                         child: PrimaryButton(
                           text: AppStrings.registerButton,
                           onPressed: _handleRegister,
@@ -305,6 +354,44 @@ class _RegisterPageState extends ConsumerState<RegisterPage>
     );
   }
 
+  Widget _buildRoleDropdown() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          "Choisissez votre rôle",
+          style: TextStyle(
+            fontSize: 14,
+            fontWeight: FontWeight.w600,
+            color: AppColors.textSecondary,
+          ),
+        ),
+        const SizedBox(height: 8),
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12),
+          decoration: BoxDecoration(
+            color: AppColors.surface,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: AppColors.border),
+          ),
+          child: DropdownButtonHideUnderline(
+            child: DropdownButton<UserRole>(
+              value: _selectedRole,
+              isExpanded: true,
+              items: [UserRole.CHAUFFEUR, UserRole.TECHNICIEN, UserRole.CHEF_ATELIER]
+                  .map((r) => DropdownMenuItem(
+                value: r,
+                child: Text(r.label),
+              ))
+                  .toList(),
+              onChanged: (v) => setState(() => _selectedRole = v!),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
   // ── ANIMATION WRAPPER ───────────────────────
   Widget _buildAnimated({required int index, required Widget child}) {
     return SlideTransition(
@@ -325,7 +412,7 @@ class _RegisterPageState extends ConsumerState<RegisterPage>
           fontFamily: 'Poppins',
         ),
         children: [
-          TextSpan(text: AppStrings.alreadyHaveAccount),
+          const TextSpan(text: AppStrings.alreadyHaveAccount),
           TextSpan(
             text: AppStrings.login,
             style: const TextStyle(
