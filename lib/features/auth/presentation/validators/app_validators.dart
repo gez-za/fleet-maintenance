@@ -1,8 +1,3 @@
-/// ============================================================
-/// AutoPark IUC - Validateurs de formulaires
-/// ============================================================
-/// Fonctions de validation réutilisables pour les champs de formulaire.
-
 class AppValidators {
   AppValidators._();
 
@@ -43,16 +38,13 @@ class AppValidators {
     return null;
   }
 
-  static String? Function(String?) validateConfirmPassword(
-      String? password) {
-    return (String? value) {
-      if (value == null || value.isEmpty) {
-        return 'Veuillez confirmer le mot de passe.';
-      }
-      if (value != password) {
-        return 'Les mots de passe ne correspondent pas.';
-      }
-      return null;
-    };
+  static String? validateConfirmPassword(String? value, String password) {
+    if (value == null || value.isEmpty) {
+      return 'Veuillez confirmer le mot de passe.';
+    }
+    if (value != password) {
+      return 'Les mots de passe ne correspondent pas.';
+    }
+    return null;
   }
 }

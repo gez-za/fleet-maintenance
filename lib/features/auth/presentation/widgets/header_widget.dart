@@ -18,13 +18,13 @@ class HeaderWidget extends StatelessWidget {
     required this.title,
     required this.subtitle,
     this.illustration,
-    this.height = 310.0,
+    this.height = 180.0,
   });
 
   @override
   Widget build(BuildContext context) {
-    return SizedBox(
-      height: height,
+    return Container(
+      constraints: BoxConstraints(minHeight: height),
       width: double.infinity,
       child: Stack(
         children: [
@@ -42,14 +42,15 @@ class HeaderWidget extends StatelessWidget {
                 horizontal: AppDimensions.paddingHorizontal,
               ),
               child: Column(
+                mainAxisSize: MainAxisSize.min,
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  const SizedBox(height: AppDimensions.space8),
+                  const SizedBox(height: AppDimensions.space16),
 
                   // Illustration (icône par défaut si non fournie)
                   _buildIllustration(),
 
-                  const SizedBox(height: AppDimensions.space20),
+                  const SizedBox(height: AppDimensions.space12),
 
                   // Titre
                   Text(
@@ -57,14 +58,14 @@ class HeaderWidget extends StatelessWidget {
                     textAlign: TextAlign.center,
                     style: const TextStyle(
                       color:      AppColors.white,
-                      fontSize:   AppDimensions.fontXXL,
+                      fontSize:   22,
                       fontWeight: FontWeight.w700,
                       fontFamily: 'Poppins',
                       height:     1.2,
                     ),
                   ),
 
-                  const SizedBox(height: AppDimensions.space8),
+                  const SizedBox(height: 4),
 
                   // Sous-titre
                   Text(
@@ -72,7 +73,7 @@ class HeaderWidget extends StatelessWidget {
                     textAlign: TextAlign.center,
                     style: TextStyle(
                       color:      AppColors.white.withOpacity(0.85),
-                      fontSize:   AppDimensions.fontBase,
+                      fontSize:   13,
                       fontWeight: FontWeight.w400,
                       fontFamily: 'Poppins',
                     ),
@@ -94,8 +95,8 @@ class HeaderWidget extends StatelessWidget {
     }
     // Illustration par défaut : icône voiture dans cercle blanc semi-transparent
     return Container(
-      width: 100,
-      height: 100,
+      width: 70,
+      height: 70,
       decoration: BoxDecoration(
         color: Colors.white.withOpacity(0.15),
         shape: BoxShape.circle,
@@ -120,40 +121,40 @@ class _CarIllustration extends StatelessWidget {
       children: [
         // Bus scolaire (gauche, plus petit)
         Positioned(
-          left: 8,
-          bottom: 18,
+          left: 6,
+          bottom: 12,
           child: Icon(
             Icons.directions_bus_rounded,
-            size: 36,
+            size: 24,
             color: Colors.amber.shade300,
           ),
         ),
         // Véhicule principal (centre)
         const Positioned(
-          right: 6,
-          bottom: 20,
+          right: 4,
+          bottom: 14,
           child: Icon(
             Icons.directions_car_filled_rounded,
-            size: 40,
+            size: 28,
             color: Colors.white,
           ),
         ),
         // Technicien (centre haut)
         Positioned(
-          top: 12,
+          top: 8,
           child: Icon(
             Icons.engineering_rounded,
-            size: 44,
+            size: 30,
             color: Colors.white.withOpacity(0.95),
           ),
         ),
         // Pin de localisation
         Positioned(
-          top: 8,
-          left: 14,
+          top: 6,
+          left: 10,
           child: Icon(
             Icons.location_on_rounded,
-            size: 20,
+            size: 14,
             color: Colors.red.shade300,
           ),
         ),

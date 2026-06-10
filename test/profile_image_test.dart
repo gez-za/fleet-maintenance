@@ -1,7 +1,5 @@
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:image_picker/image_picker.dart';
 import 'package:fleet_maintenance_app/features/auth/presentation/pages/profile_page.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 

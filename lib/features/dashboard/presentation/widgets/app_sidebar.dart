@@ -6,27 +6,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/models/user.dart';
+import '../../../../core/utils/menu_utils.dart';
 import '../../../auth/presentation/providers/auth_notifier.dart';
 import '../../../../core/widgets/user_avatar.dart';
-
-// ── Modèle d'un item de navigation ────────────────────────────
-class NavItem {
-  final String   label;
-  final IconData icon;
-  final int      index;
-  const NavItem({required this.label, required this.icon, required this.index});
-}
-
-const _navItems = [
-  NavItem(label: 'Tableau de bord', icon: Icons.dashboard_rounded,       index: 0),
-  NavItem(label: 'Véhicules',       icon: Icons.directions_car_rounded,   index: 1),
-  NavItem(label: 'Pannes',          icon: Icons.warning_amber_rounded,    index: 2),
-  NavItem(label: 'Atelier',         icon: Icons.build_rounded,            index: 3),
-  NavItem(label: 'Carburant',       icon: Icons.local_gas_station_rounded, index: 4),
-  NavItem(label: 'Chauffeurs',      icon: Icons.badge_rounded,            index: 5),
-  NavItem(label: 'Matériels',       icon: Icons.inventory_2_rounded,      index: 6),
-  NavItem(label: 'Fournisseurs',    icon: Icons.store_rounded,            index: 7),
-];
 
 class AppSidebar extends ConsumerWidget {
   final int            selectedIndex;
@@ -43,6 +25,8 @@ class AppSidebar extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final user = ref.watch(authProvider).user;
+    final navItems = NavItem.getItemsByRole(user?.role);
+
     return Container(
       width:  240,
       height: double.infinity,
@@ -53,8 +37,8 @@ class AppSidebar extends ConsumerWidget {
           children: [
             _buildHeader(),
             const SizedBox(height: 8),
-            Expanded(child: _buildNavList()),
-            _buildUserProfile(context, ref, user),
+            Expanded(child: _buildNavList(navItems)),
+            if (user != null) _buildUserProfile(context, ref, user),
           ],
         ),
       ),
@@ -90,14 +74,14 @@ class AppSidebar extends ConsumerWidget {
     );
   }
 
-  Widget _buildNavList() {
+  Widget _buildNavList(List<NavItem> navItems) {
     return ListView.builder(
       padding:     const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-      itemCount:   _navItems.length,
+      itemCount:   navItems.length,
       itemBuilder: (_, i) => _NavTile(
-        item:     _navItems[i],
-        isActive: selectedIndex == _navItems[i].index,
-        onTap:    () => onSelect(_navItems[i].index),
+        item:     navItems[i],
+        isActive: selectedIndex == navItems[i].index,
+        onTap:    () => onSelect(navItems[i].index),
       ),
     );
   }
@@ -163,6 +147,7 @@ class AppSidebar extends ConsumerWidget {
             onPressed: () {
               Navigator.pop(context);
               ref.read(authProvider.notifier).logout();
+              Navigator.of(context).pushNamedAndRemoveUntil('/login', (route) => false);
             },
             style: ElevatedButton.styleFrom(backgroundColor: AppColors.unavailable),
             child: const Text('Déconnexion'),

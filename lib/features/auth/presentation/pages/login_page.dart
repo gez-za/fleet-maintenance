@@ -1,6 +1,6 @@
-/// ============================================================
-/// AutoPark IUC - Page de Connexion
-/// ============================================================
+// ============================================================
+// AutoPark IUC - Page de Connexion
+// ============================================================
 
 import 'package:flutter/material.dart';
 import 'package:flutter/gestures.dart';
@@ -49,6 +49,37 @@ class _LoginPageState extends ConsumerState<LoginPage>
   void initState() {
     super.initState();
     _initAnimations();
+    _loadSavedCredentials();
+    _emailController.addListener(_onEmailChanged);
+  }
+
+  Future<void> _loadSavedCredentials() async {
+    final notifier = ref.read(authProvider.notifier);
+    final lastEmail = await notifier.getLastEmail();
+    if (lastEmail != null) {
+      _emailController.text = lastEmail;
+      final savedPass = await notifier.getSavedPassword(lastEmail);
+      if (savedPass != null) {
+        _passwordController.text = savedPass;
+      }
+    }
+  }
+
+  void _onEmailChanged() {
+    final email = _emailController.text.trim();
+    if (email.isNotEmpty && AppValidators.validateEmail(email) == null) {
+      _tryAutoFillPassword(email);
+    }
+  }
+
+  Future<void> _tryAutoFillPassword(String email) async {
+    final notifier = ref.read(authProvider.notifier);
+    final savedPass = await notifier.getSavedPassword(email);
+    if (savedPass != null && _passwordController.text.isEmpty) {
+      setState(() {
+        _passwordController.text = savedPass;
+      });
+    }
   }
 
   void _initAnimations() {
@@ -123,9 +154,9 @@ class _LoginPageState extends ConsumerState<LoginPage>
       if (authState.user != null) {
         _showSuccessSnackbar();
         if (authState.user?.profile == null) {
-          Navigator.of(context).pushReplacementNamed('/profile-setup');
+          Navigator.of(context).pushNamedAndRemoveUntil('/profile-setup', (route) => false);
         } else {
-          Navigator.of(context).pushReplacementNamed('/dashboard');
+          Navigator.of(context).pushNamedAndRemoveUntil('/dashboard', (route) => false);
         }
       } else if (authState.error != null) {
         setState(() {
@@ -147,8 +178,6 @@ class _LoginPageState extends ConsumerState<LoginPage>
   // ── UI ────────────────────────────────────────────────
   @override
   Widget build(BuildContext context) {
-    final authState = ref.watch(authProvider);
-
     return Scaffold(
       backgroundColor: AppColors.background,
       resizeToAvoidBottomInset: true,
@@ -178,7 +207,7 @@ class _LoginPageState extends ConsumerState<LoginPage>
                   child: Column(
                     children: [
 
-                      const SizedBox(height: AppDimensions.space32),
+                      const SizedBox(height: AppDimensions.space24),
 
                       // EMAIL
                       _buildAnimated(
@@ -196,7 +225,7 @@ class _LoginPageState extends ConsumerState<LoginPage>
                         ),
                       ),
 
-                      const SizedBox(height: AppDimensions.space20),
+                      const SizedBox(height: AppDimensions.space16),
 
                       // PASSWORD
                       _buildAnimated(
@@ -214,13 +243,28 @@ class _LoginPageState extends ConsumerState<LoginPage>
                         ),
                       ),
 
-                      const SizedBox(height: AppDimensions.space24),
+                      Align(
+                        alignment: Alignment.centerRight,
+                        child: TextButton(
+                          onPressed: () => Navigator.pushNamed(context, '/forgot-password'),
+                          child: const Text(
+                            'Mot de passe oublié ?',
+                            style: TextStyle(
+                              color: AppColors.primary,
+                              fontWeight: FontWeight.w600,
+                              fontSize: 12,
+                            ),
+                          ),
+                        ),
+                      ),
+
+                      const SizedBox(height: 0),
 
                       // ERROR GLOBAL
                       if (_globalError != null)
                         Container(
-                          padding: const EdgeInsets.all(12),
-                          margin: const EdgeInsets.only(bottom: 16),
+                          padding: const EdgeInsets.all(10),
+                          margin: const EdgeInsets.only(bottom: 12),
                           decoration: BoxDecoration(
                             color: Colors.red.withOpacity(0.1),
                             borderRadius: BorderRadius.circular(8),
@@ -232,7 +276,7 @@ class _LoginPageState extends ConsumerState<LoginPage>
                           ),
                         ),
 
-                      const SizedBox(height: AppDimensions.space24),
+                      const SizedBox(height: AppDimensions.space16),
 
                       // BUTTON LOGIN
                       _buildAnimated(
@@ -245,7 +289,7 @@ class _LoginPageState extends ConsumerState<LoginPage>
                         ),
                       ),
 
-                      const SizedBox(height: AppDimensions.space16),
+                      const SizedBox(height: AppDimensions.space12),
 
                       // REGISTER LINK
                       Center(

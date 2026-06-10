@@ -1,11 +1,11 @@
-/// ============================================================
-/// AutoPark IUC - ApiConstants (URL corrigée pour Flutter Web)
-/// ============================================================
-///
-/// PROBLÈME RÉSOLU :
-/// Flutter Web s'exécute dans un navigateur. Une requête vers
-/// 192.168.1.118 depuis localhost déclenche une politique CORS.
-/// On utilise donc une URL adaptée à chaque plateforme/mode.
+// ============================================================
+// AutoPark IUC - ApiConstants (URL corrigée pour Flutter Web)
+// ============================================================
+//
+// PROBLÈME RÉSOLU :
+// Flutter Web s'exécute dans un navigateur. Une requête vers
+// 192.168.1.118 depuis localhost déclenche une politique CORS.
+// On utilise donc une URL adaptée à chaque plateforme/mode.
 
 import 'package:flutter/foundation.dart';
 
@@ -22,10 +22,9 @@ class ApiConstants {
       return 'http://127.0.0.1:5000/api/v1/';
     }
 
-    if (defaultTargetPlatform == TargetPlatform.android) {
-      return 'http://10.0.2.2:5000/api/v1/';
-    }
-
+    // NOTE : 10.0.2.2 est uniquement pour l'ÉMULATEUR Android.
+    // Pour un MOBILE PHYSIQUE, il FAUT l'IP locale de ton PC (ex: 192.168.1.118).
+    // Si tu utilises l'émulateur, remplace par 'http://10.0.2.2:5000/api/v1/'
     return 'http://192.168.1.118:5000/api/v1/';
   }
 
@@ -39,7 +38,7 @@ class ApiConstants {
     
     // Si le path commence par /, on l'enlève pour éviter le double //
     final cleanPath = path.startsWith('/') ? path.substring(1) : path;
-    return '${uploadUrl}$cleanPath';
+    return '$uploadUrl$cleanPath';
   }
 
   // ─── Timeouts ─────────────────────────────────────────────────

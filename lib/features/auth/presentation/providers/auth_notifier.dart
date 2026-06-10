@@ -15,12 +15,14 @@ class AuthState {
   final User? user;
   final String? error;
   final bool needsProfile; 
+  final bool hasSession; // True if a user has logged in once on this device
 
   AuthState({
     this.isLoading = false, 
     this.user, 
     this.error,
     this.needsProfile = false,
+    this.hasSession = false,
   });
 
   bool get isAuthenticated => user != null;
@@ -30,12 +32,14 @@ class AuthState {
     User? user,
     String? error,
     bool? needsProfile,
+    bool? hasSession,
   }) {
     return AuthState(
       isLoading: isLoading ?? this.isLoading,
       user: user ?? this.user,
       error: error ?? this.error,
       needsProfile: needsProfile ?? this.needsProfile,
+      hasSession: hasSession ?? this.hasSession,
     );
   }
 }
@@ -58,22 +62,124 @@ class AuthNotifier extends Notifier<AuthState> {
     _api = ref.watch(apiServiceProvider);
     _storage = ref.watch(secureStorageProvider);
     
-    _init();
+    // On lance l'init mais on retourne un état de chargement initial
+    Future.microtask(() => _init());
     
-    return AuthState();
+    return AuthState(isLoading: true);
   }
 
   Future<void> _init() async {
     try {
       final token = await _storage.read(key: 'jwt_token');
-      final data = await _storage.read(key: ApiConstants.userDataKey);
-      
-      if (token != null && data != null) {
-        state = AuthState(user: User.fromJson(jsonDecode(data)));
+      final hasSession = await _storage.read(key: 'has_session') == 'true';
+
+      if (token != null) {
+        // Validation active du token avec /auth/me
+        final response = await _api.get(ApiEndpoints.me);
+        final user = User.fromJson(response.data['data']);
+        
+        // Mise à jour locale au cas où les infos ont changé
+        await _storage.write(key: ApiConstants.userDataKey, value: jsonEncode(user.toJson()));
+        
+        state = AuthState(
+          isLoading: false,
+          user: user, 
+          hasSession: true, 
+        );
+      } else {
+        state = AuthState(
+          isLoading: false,
+          hasSession: hasSession, 
+        );
       }
     } catch (e) {
-      // Ignorer l'erreur d'init
+      // Si erreur (token expiré par ex), on nettoie mais on garde l'info de session existante
+      final hasSession = await _storage.read(key: 'has_session') == 'true';
+      
+      await _storage.delete(key: 'jwt_token');
+      await _storage.delete(key: ApiConstants.userDataKey);
+      
+      state = AuthState(
+        isLoading: false,
+        hasSession: hasSession,
+      );
     }
+  }
+
+  /// Vérification si un email existe
+  Future<bool> checkEmail(String email) async {
+    state = state.copyWith(isLoading: true, error: null);
+    try {
+      final response = await _api.post(ApiEndpoints.checkEmail, data: {
+        'email': email.trim(),
+      });
+      state = state.copyWith(isLoading: false);
+      return response.data['success'] ?? true;
+    } catch (e) {
+      state = state.copyWith(isLoading: false, error: e.toString());
+      return false;
+    }
+  }
+
+  /// Demande de réinitialisation de mot de passe
+  Future<bool> forgotPassword(String email) async {
+    state = state.copyWith(isLoading: true, error: null);
+    try {
+      final response = await _api.post(ApiEndpoints.forgotPassword, data: {
+        'email': email.trim(),
+      });
+      state = state.copyWith(isLoading: false);
+      return response.data['success'] ?? true;
+    } catch (e) {
+      state = state.copyWith(isLoading: false, error: e.toString());
+      return false;
+    }
+  }
+
+  /// Réinitialisation effective du mot de passe
+  Future<bool> resetPassword({
+    required String email,
+    required String token,
+    required String newPassword,
+    required String confirmPassword,
+  }) async {
+    state = state.copyWith(isLoading: true, error: null);
+    try {
+      final response = await _api.post(ApiEndpoints.resetPassword, data: {
+        'email': email.trim(),
+        'token': token.trim(),
+        'password': newPassword,
+        'confirmPassword': confirmPassword,
+      });
+      
+      if (response.data['success'] == true) {
+        // Optionnel: sauvegarder le nouveau mot de passe
+        await saveCredentials(email, newPassword);
+      }
+      
+      state = state.copyWith(isLoading: false);
+      return response.data['success'] ?? true;
+    } catch (e) {
+      state = state.copyWith(isLoading: false, error: e.toString());
+      return false;
+    }
+  }
+
+  /// Sauvegarde sécurisée des credentials
+  Future<void> saveCredentials(String email, String password) async {
+    await _storage.write(key: 'saved_pass_${email.trim().toLowerCase()}', value: password);
+    // On garde trace du dernier email pour faciliter le remplissage
+    await _storage.write(key: 'last_email', value: email.trim());
+  }
+
+  /// Récupération du mot de passe sauvegardé
+  Future<String?> getSavedPassword(String email) async {
+    return await _storage.read(key: 'saved_pass_${email.trim().toLowerCase()}');
+  }
+
+  /// Récupération du dernier email utilisé
+  Future<String?> getLastEmail() async {
+    return await _storage.read(key: 'last_email');
   }
 
   /// Login direct avec le Backend
@@ -88,11 +194,15 @@ class AuthNotifier extends Notifier<AuthState> {
       final user = User.fromJson(response.data['data']['user']);
       final token = response.data['data']['token'];
 
-      // Sauvegarde
+      // Sauvegarde du token et des infos user
       await _storage.write(key: 'jwt_token', value: token);
       await _storage.write(key: ApiConstants.userDataKey, value: jsonEncode(user.toJson()));
+      await _storage.write(key: 'has_session', value: 'true');
       
-      state = state.copyWith(isLoading: false, user: user);
+      // Sauvegarde des credentials pour la prochaine fois
+      await saveCredentials(email, password);
+      
+      state = state.copyWith(isLoading: false, user: user, hasSession: true);
     } catch (e) {
       state = state.copyWith(isLoading: false, error: e.toString());
     }
@@ -104,6 +214,7 @@ class AuthNotifier extends Notifier<AuthState> {
     required String prenom,
     required String email,
     required String password,
+    required String confirmPassword,
     required UserRole role,
     String? telephone,
   }) async {
@@ -114,6 +225,7 @@ class AuthNotifier extends Notifier<AuthState> {
         'prenom': prenom,
         'email': email.trim(),
         'password': password,
+        'confirmPassword': confirmPassword,
         'role': role.name,
         'telephone': telephone,
       });
@@ -123,8 +235,12 @@ class AuthNotifier extends Notifier<AuthState> {
 
       await _storage.write(key: 'jwt_token', value: token);
       await _storage.write(key: ApiConstants.userDataKey, value: jsonEncode(user.toJson()));
+      await _storage.write(key: 'has_session', value: 'true');
 
-      state = state.copyWith(isLoading: false, user: user, needsProfile: false);
+      // Sauvegarde des credentials à l'inscription
+      await saveCredentials(email, password);
+
+      state = state.copyWith(isLoading: false, user: user, needsProfile: false, hasSession: true);
     } catch (e) {
       state = state.copyWith(isLoading: false, error: e.toString());
     }
@@ -144,17 +260,25 @@ class AuthNotifier extends Notifier<AuthState> {
     String? specialite,
     String? numeroPermis,
     String? categoriePermis,
+    String?  dateExpirationPermis,
+    int?  kmCumule
   }) async {
     state = state.copyWith(isLoading: true, error: null);
 
     try {
+      final currentUser = state.user;
       final Map<String, dynamic> data = {
         'nom': nom,
         'prenom': prenom,
-        'role': role.name,
         'telephone': telephone,
         'adresse': adresse,
       };
+
+      // 🔹 On ne renvoie le rôle que si l'utilisateur est ADMIN
+      // (Le backend rejette désormais les changements de rôle via /profiles pour les autres)
+      if (currentUser?.isAdmin ?? false) {
+        data['role'] = role.name;
+      }
 
       // 🔹 Données spécifiques au rôle
       if (role == UserRole.TECHNICIEN) {
@@ -243,6 +367,15 @@ class AuthNotifier extends Notifier<AuthState> {
   Future<void> logout() async {
     await _storage.delete(key: 'jwt_token');
     await _storage.delete(key: ApiConstants.userDataKey);
+    // On garde 'has_session' pour permettre de savoir si l'user a déjà été là
+    state = AuthState(
+      hasSession: state.hasSession,
+    );
+  }
+
+  /// Clear session entirely (wipe everything)
+  Future<void> clearAllData() async {
+    await _storage.deleteAll();
     state = AuthState();
   }
 }

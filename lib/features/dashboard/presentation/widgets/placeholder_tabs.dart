@@ -3,9 +3,11 @@
 // ============================================================
 
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/constants/app_colors.dart';
+import '../../../auth/presentation/providers/auth_notifier.dart';
 
-class PlaceholderTab extends StatelessWidget {
+class PlaceholderTab extends ConsumerWidget {
   final String   title;
   final IconData icon;
   final Color    color;
@@ -18,11 +20,16 @@ class PlaceholderTab extends StatelessWidget {
   });
 
   @override
-  Widget build(BuildContext context) {
-    return Center(
+  Widget build(BuildContext context, WidgetRef ref) {
+    final isAdmin = ref.watch(authProvider).user?.isAdmin ?? false;
+
+    return SingleChildScrollView(
+      physics: const BouncingScrollPhysics(),
+      padding: const EdgeInsets.all(24),
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
+          const SizedBox(height: 20),
           Container(
             width: 80, height: 80,
             decoration: BoxDecoration(
@@ -41,15 +48,16 @@ class PlaceholderTab extends StatelessWidget {
           const Text('Module en cours de développement',
               style: TextStyle(fontSize: 14, color: AppColors.textSecondary)),
           const SizedBox(height: 24),
-          ElevatedButton.icon(
-            onPressed: () {},
-            icon:  const Icon(Icons.add_rounded),
-            label: Text('Ajouter un(e) $title'),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: color,
-              foregroundColor: Colors.white,
+          if (isAdmin)
+            ElevatedButton.icon(
+              onPressed: () {},
+              icon:  const Icon(Icons.add_rounded),
+              label: Text('Ajouter un(e) $title'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: color,
+                foregroundColor: Colors.white,
+              ),
             ),
-          ),
         ],
       ),
     );
@@ -86,11 +94,11 @@ class AtelierTab extends StatelessWidget {
   );
 }
 
-class CarburantTab extends StatelessWidget {
-  const CarburantTab({super.key});
+class DepensesTab extends StatelessWidget {
+  const DepensesTab({super.key});
   @override
   Widget build(BuildContext context) => const PlaceholderTab(
-    title: 'Bon de carburant',
+    title: 'Bon de depenses',
     icon:  Icons.local_gas_station_rounded,
     color: AppColors.primaryMid,
   );

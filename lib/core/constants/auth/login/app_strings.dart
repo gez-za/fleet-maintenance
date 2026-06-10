@@ -41,6 +41,6 @@ abstract class AppStrings {
   static const String navVehicules   = 'Véhicules';
   static const String navPannes      = 'Pannes';
   static const String navAtelier     = 'Atelier';
-  static const String navCarburant   = 'Carburant';
+  static const String navCarburant   = 'Depenses';
   static const String navCarte       = 'Carte';
 }

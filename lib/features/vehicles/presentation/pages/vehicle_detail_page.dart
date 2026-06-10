@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/constants/app_dimensions.dart';
+import '../../../auth/presentation/providers/auth_notifier.dart';
 import '../../models/vehicle.dart';
 import '../providers/vehicle_notifier.dart';
 import 'edit_vehicle_page.dart';
@@ -266,7 +267,9 @@ class _VehicleDetailPageState extends ConsumerState<VehicleDetailPage>
                   child: ElevatedButton(
                     onPressed: () {
                       if (nomController.text.trim().isEmpty ||
-                          permisController.text.trim().isEmpty) return;
+                          permisController.text.trim().isEmpty) {
+                        return;
+                      }
                       setState(() {
                         _affectations.add(AffectationChauffeur(
                           id: DateTime.now()
@@ -310,6 +313,8 @@ class _VehicleDetailPageState extends ConsumerState<VehicleDetailPage>
   @override
   Widget build(BuildContext context) {
     final vehicleState = ref.watch(vehicleProvider);
+    final user = ref.watch(authProvider).user;
+    final isAdmin = user?.isAdmin ?? false;
     final vehicle      = _resolveVehicle(vehicleState.vehicles);
 
     if (vehicleState.isLoading) {
@@ -355,35 +360,37 @@ class _VehicleDetailPageState extends ConsumerState<VehicleDetailPage>
             foregroundColor: AppColors.white,
             // ── Menu actions : Modifier + Supprimer ─────────────────────
             actions: [
-              IconButton(
-                icon: const Icon(Icons.edit_outlined),
-                tooltip: 'Modifier',
-                onPressed: () => _navigateToEdit(vehicle),
-              ),
-              PopupMenuButton<String>(
-                icon: const Icon(Icons.more_vert),
-                shape: RoundedRectangleBorder(
-                  borderRadius:
-                  BorderRadius.circular(AppDimensions.radiusMedium),
+              if (isAdmin)
+                IconButton(
+                  icon: const Icon(Icons.edit_outlined),
+                  tooltip: 'Modifier',
+                  onPressed: () => _navigateToEdit(vehicle),
                 ),
-                onSelected: (value) {
-                  if (value == 'delete') _confirmDelete(vehicle);
-                },
-                itemBuilder: (_) => [
-                  const PopupMenuItem(
-                    value: 'delete',
-                    child: Row(
-                      children: [
-                        Icon(Icons.delete_outline,
-                            color: AppColors.danger, size: 20),
-                        SizedBox(width: 10),
-                        Text('Supprimer',
-                            style: TextStyle(color: AppColors.danger)),
-                      ],
-                    ),
+              if (isAdmin)
+                PopupMenuButton<String>(
+                  icon: const Icon(Icons.more_vert),
+                  shape: RoundedRectangleBorder(
+                    borderRadius:
+                    BorderRadius.circular(AppDimensions.radiusMedium),
                   ),
-                ],
-              ),
+                  onSelected: (value) {
+                    if (value == 'delete') _confirmDelete(vehicle);
+                  },
+                  itemBuilder: (_) => [
+                    const PopupMenuItem(
+                      value: 'delete',
+                      child: Row(
+                        children: [
+                          Icon(Icons.delete_outline,
+                              color: AppColors.danger, size: 20),
+                          SizedBox(width: 10),
+                          Text('Supprimer',
+                              style: TextStyle(color: AppColors.danger)),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
             ],
             flexibleSpace: FlexibleSpaceBar(
               background: Stack(
@@ -463,7 +470,7 @@ class _VehicleDetailPageState extends ConsumerState<VehicleDetailPage>
                     text: 'Pannes'),
                 Tab(
                     icon: Icon(Icons.local_gas_station_outlined, size: 18),
-                    text: 'Carburant'),
+                    text: 'Depenses'),
               ],
             ),
           ),
@@ -475,6 +482,7 @@ class _VehicleDetailPageState extends ConsumerState<VehicleDetailPage>
             _ChauffeursTab(
               affectations: _affectations,
               onAffecter: _showAffectationDialog,
+              isAdmin: isAdmin,
             ),
             const _EmptyModuleTab(
               icon: Icons.build_outlined,
@@ -484,9 +492,9 @@ class _VehicleDetailPageState extends ConsumerState<VehicleDetailPage>
             ),
             const _EmptyModuleTab(
               icon: Icons.local_gas_station_outlined,
-              titre: 'Carburant',
+              titre: 'Depenses',
               message:
-              'Le module des demandes carburant\nsera disponible prochainement.',
+              'Le module des demandes Depenses\nsera disponible prochainement.',
             ),
           ],
         ),
@@ -594,10 +602,12 @@ class _InfosTab extends StatelessWidget {
 class _ChauffeursTab extends StatelessWidget {
   final List<AffectationChauffeur> affectations;
   final VoidCallback onAffecter;
+  final bool isAdmin;
 
   const _ChauffeursTab({
     required this.affectations,
     required this.onAffecter,
+    required this.isAdmin,
   });
 
   @override
@@ -617,21 +627,22 @@ class _ChauffeursTab extends StatelessWidget {
                     fontSize: AppDimensions.fontSM),
               ),
               const Spacer(),
-              FilledButton.icon(
-                onPressed: onAffecter,
-                icon: const Icon(Icons.person_add_outlined, size: 18),
-                label: const Text('Affecter'),
-                style: FilledButton.styleFrom(
-                  backgroundColor: AppColors.primary,
-                  foregroundColor: AppColors.white,
-                  padding: const EdgeInsets.symmetric(
-                      horizontal: 16, vertical: 10),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(
-                        AppDimensions.radiusMedium),
+              if (isAdmin)
+                FilledButton.icon(
+                  onPressed: onAffecter,
+                  icon: const Icon(Icons.person_add_outlined, size: 18),
+                  label: const Text('Affecter'),
+                  style: FilledButton.styleFrom(
+                    backgroundColor: AppColors.primary,
+                    foregroundColor: AppColors.white,
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 16, vertical: 10),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(
+                          AppDimensions.radiusMedium),
+                    ),
                   ),
                 ),
-              ),
             ],
           ),
         ),

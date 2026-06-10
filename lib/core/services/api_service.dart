@@ -82,6 +82,16 @@ class ApiService {
     }
   }
 
+  // ── PATCH ─────────────────────────────────────────────────────────────────
+
+  Future<Response> patch(String path, {dynamic data}) async {
+    try {
+      return await _dio.patch(path, data: data);
+    } on DioException catch (e) {
+      throw e.error ?? 'Erreur réseau';
+    }
+  }
+
   // ── DELETE ────────────────────────────────────────────────────────────────
 
   Future<Response> delete(String path, {dynamic data}) async {
@@ -102,15 +112,23 @@ class ApiService {
 
     final responseData = e.response?.data;
     if (responseData is Map) {
-      if (responseData.containsKey('errors') &&
-          responseData['errors'] is List) {
-        final List errors = responseData['errors'];
-        if (errors.isNotEmpty) {
-          return '${responseData['message'] ?? 'Erreur'}: ${errors.join(", ")}';
+      // Priorité au message du format standardisé { success, message, data, errors }
+      if (responseData.containsKey('message') && responseData['message'] != null) {
+        String msg = responseData['message'];
+        
+        // Si on a des erreurs de validation détaillées (List ou Map)
+        if (responseData.containsKey('errors')) {
+          final errs = responseData['errors'];
+          if (errs is List && errs.isNotEmpty) {
+            msg += ': ${errs.join(", ")}';
+          } else if (errs is Map && errs.isNotEmpty) {
+            final allErrors = errs.values
+                .expand((v) => v is List ? v : [v])
+                .join(", ");
+            if (allErrors.isNotEmpty) msg += ': $allErrors';
+          }
         }
-      }
-      if (responseData.containsKey('message')) {
-        return responseData['message'];
+        return msg;
       }
     }
 

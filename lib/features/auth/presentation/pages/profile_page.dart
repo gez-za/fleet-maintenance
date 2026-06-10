@@ -4,7 +4,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image_picker/image_picker.dart';
 
-import '../../../../core/utils/image_picker_web_fallback.dart';
+import '../../../../core/utils/image_picker_mobile_fallback.dart'
+    if (dart.library.html) '../../../../core/utils/image_picker_web_fallback.dart';
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/constants/app_dimensions.dart';
 import '../../../../core/models/user.dart';
@@ -13,6 +14,19 @@ import '../providers/auth_notifier.dart';
 import '../widgets/custom_text_field.dart';
 import '../widgets/header_widget.dart';
 import '../widgets/primary_button.dart';
+
+// ─────────────────────────────────────────────────────────────────────────────
+// ProfilePage — Création et édition du profil utilisateur
+//
+// Tables concernées (schéma PostgreSQL) :
+//   • profiles     → nom, prenom, telephone, adresse, photo_url
+//   • chauffeurs   → numero_permis, categorie_permis,
+//                    date_expiration_permis (NOT NULL), km_cumule (NOT NULL)
+//   • techniciens  → matricule, specialite
+//
+// Le champ `role` (table users) est en lecture seule :
+// il est attribué par un ADMIN et ne doit pas être modifiable ici.
+// ─────────────────────────────────────────────────────────────────────────────
 
 class ProfilePage extends ConsumerStatefulWidget {
   const ProfilePage({super.key});
@@ -24,115 +38,149 @@ class ProfilePage extends ConsumerStatefulWidget {
 }
 
 class _ProfilePageState extends ConsumerState<ProfilePage>
-    with TickerProviderStateMixin {
-  final _formKey             = GlobalKey<FormState>();
-  final _picker              = ImagePicker();
-  final _nomController       = TextEditingController();
-  final _prenomController    = TextEditingController();
-  final _phoneController     = TextEditingController();
-  final _addressController   = TextEditingController();
-  final _matriculeController = TextEditingController();
-  final _specialiteController = TextEditingController();
+    with SingleTickerProviderStateMixin {
+
+  final _formKey = GlobalKey<FormState>();
+
+  // ── Contrôleurs — table profiles ─────────────────────────────────────────
+  final _nomController     = TextEditingController();
+  final _prenomController  = TextEditingController();
+  final _phoneController   = TextEditingController();
+  final _addressController = TextEditingController();
+
+  // ── Contrôleurs — table chauffeurs ───────────────────────────────────────
   final _permisNumController = TextEditingController();
   final _permisCatController = TextEditingController();
+  final _kmCumuleController  = TextEditingController(); // km_cumule NOT NULL DEFAULT 0
+  DateTime? _dateExpirationPermis;                      // date_expiration_permis NOT NULL
 
-  UserRole _selectedRole = UserRole.CHAUFFEUR;
+  // ── Contrôleurs — table techniciens ──────────────────────────────────────
+  final _matriculeController  = TextEditingController();
+  final _specialiteController = TextEditingController();
 
-  // ── Photo de profil ──────────────────────────────────────────
-  File?   _imageFile;        // image choisie localement (mobile)
-  Uint8List? _webImageBytes; // image choisie localement (web/mobile bytes)
-  String? _pickedFileName;   // nom du fichier choisi
-  bool    _isUploadingPhoto = false;
+  // ── Image de profil ───────────────────────────────────────────────────────
+  final _picker = ImagePicker();
+  File?      _imageFile;
+  Uint8List? _webImageBytes;
+  String?    _pickedFileName;
+  bool       _isPickingImage = false;
 
-  late AnimationController      _animController;
-  late List<Animation<Offset>>  _slideAnimations;
-  late List<Animation<double>>  _fadeAnimations;
+  // ── Animation d'entrée ───────────────────────────────────────────────────
+  late final AnimationController _animController;
+  late final Animation<double>   _fadeAnim;
+  late final Animation<Offset>   _slideAnim;
 
-  // ── Cycle de vie ─────────────────────────────────────────────
+  // ── Rôle lu depuis le provider (lecture seule) ────────────────────────────
+  UserRole get _userRole =>
+      ref.read(authProvider).user?.role ?? UserRole.CHAUFFEUR;
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // Cycle de vie
+  // ─────────────────────────────────────────────────────────────────────────
 
   @override
   void initState() {
     super.initState();
+
     _animController = AnimationController(
-      duration: const Duration(milliseconds: 800),
+      duration: const Duration(milliseconds: 600),
       vsync: this,
     );
-    _initAnimations();
+    _fadeAnim  = CurvedAnimation(parent: _animController, curve: Curves.easeIn);
+    _slideAnim = Tween<Offset>(
+      begin: const Offset(0, 0.06),
+      end: Offset.zero,
+    ).animate(CurvedAnimation(
+        parent: _animController, curve: Curves.easeOutQuart));
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      final user = ref.read(authProvider).user;
-      if (user != null) {
-        setState(() => _selectedRole = user.role);
-        if (user.profile != null) {
-          _nomController.text     = user.profile!.nom;
-          _prenomController.text  = user.profile!.prenom;
-          _phoneController.text   = user.profile!.telephone ?? '';
-          _addressController.text = user.profile!.adresse   ?? '';
-
-          if (user.roleInfo != null) {
-            if (user.role == UserRole.TECHNICIEN) {
-              _matriculeController.text  = user.roleInfo!['matricule']  ?? '';
-              _specialiteController.text = user.roleInfo!['specialite'] ?? '';
-            } else if (user.role == UserRole.CHAUFFEUR) {
-              _permisNumController.text = user.roleInfo!['numero_permis']    ?? '';
-              _permisCatController.text = user.roleInfo!['categorie_permis'] ?? '';
-            }
-          }
-        }
-      }
+      _prefillFromState();
       _animController.forward();
     });
   }
 
-  void _initAnimations() {
-    _slideAnimations = List.generate(
-      11,
-          (i) => Tween<Offset>(
-        begin: const Offset(0, 0.1),
-        end: Offset.zero,
-      ).animate(CurvedAnimation(
-        parent: _animController,
-        curve: Interval(
-          i * 0.05,
-          0.5 + (i * 0.05),
-          curve: Curves.easeOutQuart,
-        ),
-      )),
-    );
-    _fadeAnimations = List.generate(
-      11,
-          (i) => Tween<double>(begin: 0, end: 1).animate(CurvedAnimation(
-        parent: _animController,
-        curve: Interval(
-          i * 0.05,
-          0.4 + (i * 0.05),
-          curve: Curves.easeIn,
-        ),
-      )),
-    );
+  void _prefillFromState() {
+    final user = ref.read(authProvider).user;
+    if (user == null) return;
+
+    final p = user.profile;
+    if (p != null) {
+      _nomController.text     = p.nom;
+      _prenomController.text  = p.prenom;
+      _phoneController.text   = p.telephone ?? '';
+      _addressController.text = p.adresse   ?? '';
+    }
+
+    final roleInfo = user.roleInfo;
+    if (roleInfo != null) {
+      if (user.role == UserRole.TECHNICIEN) {
+        _matriculeController.text  = roleInfo['matricule']  ?? '';
+        _specialiteController.text = roleInfo['specialite'] ?? '';
+      } else if (user.role == UserRole.CHAUFFEUR) {
+        _permisNumController.text = roleInfo['numero_permis']    ?? '';
+        _permisCatController.text = roleInfo['categorie_permis'] ?? '';
+        _kmCumuleController.text  =
+            (roleInfo['km_cumule'] ?? 0).toString();
+
+        // date_expiration_permis — parsé depuis ISO string ou DATE PG
+        final rawDate = roleInfo['date_expiration_permis'];
+        if (rawDate != null && rawDate is String && rawDate.isNotEmpty) {
+          _dateExpirationPermis = DateTime.tryParse(rawDate);
+        }
+      }
+    }
   }
 
   @override
   void dispose() {
+    _animController.dispose();
     for (final c in [
-      _nomController,
-      _prenomController,
-      _phoneController,
-      _addressController,
-      _matriculeController,
-      _specialiteController,
-      _permisNumController,
-      _permisCatController,
+      _nomController, _prenomController, _phoneController, _addressController,
+      _permisNumController, _permisCatController, _kmCumuleController,
+      _matriculeController, _specialiteController,
     ]) {
       c.dispose();
     }
-    _animController.dispose();
     super.dispose();
   }
 
-  // ── Photo — sélection ────────────────────────────────────────
+  // ─────────────────────────────────────────────────────────────────────────
+  // Sélecteur de date d'expiration du permis
+  // ─────────────────────────────────────────────────────────────────────────
 
-  void _showPhotoSourceSheet() {
+  Future<void> _pickExpirationDate() async {
+    final now  = DateTime.now();
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: _dateExpirationPermis ?? now.add(const Duration(days: 365)),
+      firstDate: now,                                    // pas de date passée
+      lastDate: DateTime(now.year + 20),
+      helpText: 'Date d\'expiration du permis',
+      confirmText: 'CONFIRMER',
+      cancelText: 'ANNULER',
+      builder: (ctx, child) => Theme(
+        data: Theme.of(ctx).copyWith(
+          colorScheme: const ColorScheme.light(
+            primary: Color(0xFF1A6B3A),
+            onPrimary: Colors.white,
+          ),
+        ),
+        child: child!,
+      ),
+    );
+    if (picked != null) {
+      setState(() => _dateExpirationPermis = picked);
+    }
+  }
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // Gestion de l'image
+  // ─────────────────────────────────────────────────────────────────────────
+
+  void _showPhotoSheet() {
+    final hasPhoto = _webImageBytes != null ||
+        (ref.read(authProvider).user?.profile?.photoUrl?.isNotEmpty ?? false);
+
     showModalBottomSheet(
       context: context,
       shape: const RoundedRectangleBorder(
@@ -145,62 +193,47 @@ class _ProfilePageState extends ConsumerState<ProfilePage>
             mainAxisSize: MainAxisSize.min,
             children: [
               Container(
-                width: 40,
-                height: 4,
+                width: 40, height: 4,
                 decoration: BoxDecoration(
                   color: Colors.grey.shade300,
                   borderRadius: BorderRadius.circular(2),
                 ),
               ),
               const SizedBox(height: 16),
-              const Text(
-                'Choisir une photo',
-                style: TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
+              const Text('Choisir une photo',
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
               const SizedBox(height: 8),
               ListTile(
-                leading: const CircleAvatar(
-                  backgroundColor: Color(0xFFE8F5E9),
-                  child: Icon(Icons.photo_library_outlined,
-                      color: Color(0xFF1A6B3A)),
-                ),
+                leading: _sheetIcon(Icons.photo_library_outlined),
                 title: Text(kIsWeb ? 'Choisir un fichier' : 'Galerie photos'),
                 onTap: () {
-                  Navigator.of(context).pop();
+                  Navigator.pop(context);
                   _pickImage(ImageSource.gallery);
                 },
               ),
               if (!kIsWeb)
                 ListTile(
-                  leading: const CircleAvatar(
-                    backgroundColor: Color(0xFFE8F5E9),
-                    child: Icon(Icons.camera_alt_outlined,
-                        color: Color(0xFF1A6B3A)),
-                  ),
+                  leading: _sheetIcon(Icons.camera_alt_outlined),
                   title: const Text('Prendre une photo'),
                   onTap: () {
-                    Navigator.of(context).pop();
+                    Navigator.pop(context);
                     _pickImage(ImageSource.camera);
                   },
                 ),
-              if (_imageFile != null || _webImageBytes != null || (ref.read(authProvider).user?.profile?.photoUrl?.isNotEmpty ?? false))
+              if (hasPhoto)
                 ListTile(
                   leading: const CircleAvatar(
                     backgroundColor: Color(0xFFFFEBEE),
                     child: Icon(Icons.delete_outline, color: Colors.red),
                   ),
-                  title: const Text(
-                    'Supprimer la photo',
-                    style: TextStyle(color: Colors.red),
-                  ),
+                  title: const Text('Supprimer la photo',
+                      style: TextStyle(color: Colors.red)),
                   onTap: () {
-                    Navigator.of(context).pop();
+                    Navigator.pop(context);
                     setState(() {
-                      _imageFile = null;
-                      _webImageBytes = null;
+                      _imageFile      = null;
+                      _webImageBytes  = null;
+                      _pickedFileName = null;
                     });
                   },
                 ),
@@ -211,14 +244,17 @@ class _ProfilePageState extends ConsumerState<ProfilePage>
     );
   }
 
+  Widget _sheetIcon(IconData icon) => CircleAvatar(
+    backgroundColor: const Color(0xFFE8F5E9),
+    child: Icon(icon, color: const Color(0xFF1A6B3A)),
+  );
+
   Future<void> _pickImage(ImageSource source) async {
-    if (kIsWeb) await Future.delayed(const Duration(milliseconds: 100));
-    
-    setState(() => _isUploadingPhoto = true);
+    setState(() => _isPickingImage = true);
     try {
       XFile? picked;
-      
       if (kIsWeb) {
+        await Future.delayed(const Duration(milliseconds: 100));
         picked = await ImagePickerWebFallback.pickImage();
       } else {
         picked = await _picker.pickImage(
@@ -228,55 +264,64 @@ class _ProfilePageState extends ConsumerState<ProfilePage>
           maxHeight: 800,
         );
       }
-      
-      if (picked == null) {
-        setState(() => _isUploadingPhoto = false);
-        return;
-      }
-
+      if (picked == null) return;
       final bytes = await picked.readAsBytes();
-      final pName = picked.name;
-      final pPath = picked.path;
-
       setState(() {
-        _webImageBytes = bytes;
-        _pickedFileName = pName;
-        if (!kIsWeb) {
-          _imageFile = File(pPath);
-        }
-        _isUploadingPhoto = false;
+        _webImageBytes  = bytes;
+        _pickedFileName = picked!.name;
+        if (!kIsWeb) _imageFile = File(picked.path);
       });
     } catch (e) {
-      setState(() => _isUploadingPhoto = false);
-      debugPrint('Error picking image: $e');
+      debugPrint('Erreur sélection image : $e');
+    } finally {
+      setState(() => _isPickingImage = false);
     }
   }
 
-  // ── Sauvegarde ───────────────────────────────────────────────
+  // ─────────────────────────────────────────────────────────────────────────
+  // Sauvegarde
+  // ─────────────────────────────────────────────────────────────────────────
 
-  Future<void> _saveProfile() async {
+  Future<void> _save() async {
     if (!_formKey.currentState!.validate()) return;
+
+    // Validation supplémentaire : date d'expiration obligatoire pour chauffeur
+    if (_userRole == UserRole.CHAUFFEUR && _dateExpirationPermis == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Veuillez sélectionner la date d\'expiration du permis'),
+          backgroundColor: Colors.orange,
+        ),
+      );
+      return;
+    }
+
     FocusScope.of(context).unfocus();
 
     await ref.read(authProvider.notifier).updateProfile(
       nom:             _nomController.text.trim(),
       prenom:          _prenomController.text.trim(),
-      role:            _selectedRole,
+      role:            _userRole,
       telephone:       _phoneController.text.trim(),
       adresse:         _addressController.text.trim(),
-      matricule:       _matriculeController.text.trim(),
-      specialite:      _specialiteController.text.trim(),
-      numeroPermis:    _permisNumController.text.trim(),
-      categoriePermis: _permisCatController.text.trim(),
-      photoPath:       !kIsWeb ? _imageFile?.path : null,
-      photoBytes:      _webImageBytes,
-      photoName:       _pickedFileName,
+      // Champs chauffeurs
+      numeroPermis:           _permisNumController.text.trim(),
+      categoriePermis:        _permisCatController.text.trim(),
+      dateExpirationPermis:   _dateExpirationPermis?.toIso8601String().split('T').first,
+      kmCumule:               int.tryParse(_kmCumuleController.text.trim()) ?? 0,
+      // Champs techniciens
+      matricule:  _matriculeController.text.trim(),
+      specialite: _specialiteController.text.trim(),
+      // Image
+      photoPath:  !kIsWeb ? _imageFile?.path : null,
+      photoBytes: _webImageBytes,
+      photoName:  _pickedFileName,
     );
 
     if (mounted && ref.read(authProvider).error == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text("Profil enregistré"),
+          content: Text('Profil enregistré'),
           backgroundColor: Colors.green,
         ),
       );
@@ -284,21 +329,23 @@ class _ProfilePageState extends ConsumerState<ProfilePage>
     }
   }
 
-  // ── Build ────────────────────────────────────────────────────
+  // ─────────────────────────────────────────────────────────────────────────
+  // BUILD
+  // ─────────────────────────────────────────────────────────────────────────
 
   @override
   Widget build(BuildContext context) {
     final authState = ref.watch(authProvider);
+    final role      = _userRole;
+
     return Scaffold(
       backgroundColor: AppColors.background,
       appBar: AppBar(
         backgroundColor: const Color(0xFF1A6B3A),
         elevation: 0,
         centerTitle: true,
-        title: const Text(
-          "Modifier Profil",
-          style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
-        ),
+        title: const Text('Modifier Profil',
+            style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
         leading: Navigator.of(context).canPop()
             ? IconButton(
           icon: const Icon(Icons.arrow_back, color: Colors.white),
@@ -313,199 +360,368 @@ class _ProfilePageState extends ConsumerState<ProfilePage>
             children: [
               const HeaderWidget(
                 height: 160,
-                title: "Configuration",
-                subtitle: "Mise à jour de vos informations",
+                title: 'Configuration',
+                subtitle: 'Mise à jour de vos informations',
               ),
               Transform.translate(
                 offset: const Offset(0, -20),
                 child: Padding(
                   padding: const EdgeInsets.symmetric(
-                    horizontal: AppDimensions.paddingHorizontal,
-                  ),
-                  child: Container(
-                    padding: const EdgeInsets.all(AppDimensions.space20),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius:
-                      BorderRadius.circular(AppDimensions.radiusXL),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withOpacity(0.05),
-                          blurRadius: 20,
-                          offset: const Offset(0, 10),
+                      horizontal: AppDimensions.paddingHorizontal),
+                  child: SlideTransition(
+                    position: _slideAnim,
+                    child: FadeTransition(
+                      opacity: _fadeAnim,
+                      child: Container(
+                        padding: const EdgeInsets.all(AppDimensions.space20),
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(
+                              AppDimensions.radiusXL),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withOpacity(0.05),
+                              blurRadius: 20,
+                              offset: const Offset(0, 10),
+                            ),
+                          ],
                         ),
-                      ],
-                    ),
-                    child: Form(
-                      key: _formKey,
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          _buildAnimated(
-                            index: 0,
-                            child: _buildAvatarPicker(authState.user),
-                          ),
-                          const SizedBox(height: 24),
+                        child: Form(
+                          key: _formKey,
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
 
-                          _buildAnimated(
-                            index: 1,
-                            child: _buildRoleDropdown(),
-                          ),
-                          const SizedBox(height: 20),
-
-                          _buildAnimated(
-                            index: 2,
-                            child: CustomTextField(
-                              label: "Nom",
-                              hintText: "Nom",
-                              prefixIcon: Icons.person,
-                              controller: _nomController,
-                              validator: (v) =>
-                              v!.isEmpty ? "Requis" : null,
-                            ),
-                          ),
-                          const SizedBox(height: 16),
-
-                          _buildAnimated(
-                            index: 3,
-                            child: CustomTextField(
-                              label: "Prénom",
-                              hintText: "Prénom",
-                              prefixIcon: Icons.person_outline,
-                              controller: _prenomController,
-                              validator: (v) =>
-                              v!.isEmpty ? "Requis" : null,
-                            ),
-                          ),
-                          const SizedBox(height: 16),
-
-                          if (_selectedRole == UserRole.TECHNICIEN) ...[
-                            _buildAnimated(
-                              index: 4,
-                              child: CustomTextField(
-                                label: "Matricule",
-                                hintText: "Matricule",
-                                prefixIcon: Icons.badge,
-                                controller: _matriculeController,
-                                validator: (v) =>
-                                v!.isEmpty ? "Requis" : null,
+                              // ── Avatar ──────────────────────────────────
+                              _AvatarPicker(
+                                user: authState.user,
+                                imageFile: _imageFile,
+                                imageBytes: _webImageBytes,
+                                isLoading: _isPickingImage,
+                                onTap: kIsWeb
+                                    ? () => _pickImage(ImageSource.gallery)
+                                    : _showPhotoSheet,
                               ),
-                            ),
-                            const SizedBox(height: 16),
-                            _buildAnimated(
-                              index: 5,
-                              child: CustomTextField(
-                                label: "Spécialité",
-                                hintText: "Spécialité",
-                                prefixIcon: Icons.settings,
-                                controller: _specialiteController,
-                                validator: (v) =>
-                                v!.isEmpty ? "Requis" : null,
+                              const SizedBox(height: 24),
+
+                              // ── Badge rôle (lecture seule) ──────────────
+                              _RoleBadge(role: role),
+                              const SizedBox(height: 20),
+
+                              // ── Informations personnelles ────────────────
+                              const _SectionTitle(
+                                icon: Icons.person_outline,
+                                label: 'Informations personnelles',
                               ),
-                            ),
-                            const SizedBox(height: 16),
-                          ],
+                              const SizedBox(height: 12),
 
-                          if (_selectedRole == UserRole.CHAUFFEUR) ...[
-                            _buildAnimated(
-                              index: 4,
-                              child: CustomTextField(
-                                label: "Permis",
-                                hintText: "N° Permis",
-                                prefixIcon: Icons.card_membership,
-                                controller: _permisNumController,
-                                validator: (v) =>
-                                v!.isEmpty ? "Requis" : null,
+                              CustomTextField(
+                                label: 'Nom',
+                                hintText: 'Nom de famille',
+                                prefixIcon: Icons.person,
+                                controller: _nomController,
+                                validator: (v) => v!.isEmpty ? 'Requis' : null,
                               ),
-                            ),
-                            const SizedBox(height: 16),
-                            _buildAnimated(
-                              index: 5,
-                              child: CustomTextField(
-                                label: "Catégorie",
-                                hintText: "Catégorie",
-                                prefixIcon: Icons.category,
-                                controller: _permisCatController,
-                                validator: (v) =>
-                                v!.isEmpty ? "Requis" : null,
+                              const SizedBox(height: 16),
+
+                              CustomTextField(
+                                label: 'Prénom',
+                                hintText: 'Prénom',
+                                prefixIcon: Icons.person_outline,
+                                controller: _prenomController,
+                                validator: (v) => v!.isEmpty ? 'Requis' : null,
                               ),
-                            ),
-                            const SizedBox(height: 16),
-                          ],
+                              const SizedBox(height: 16),
 
-                          _buildAnimated(
-                            index: 6,
-                            child: CustomTextField(
-                              label: "Téléphone",
-                              hintText: "Tél",
-                              prefixIcon: Icons.phone,
-                              controller: _phoneController,
-                              keyboardType: TextInputType.phone,
-                              validator: (v) =>
-                              v!.isEmpty ? "Requis" : null,
-                            ),
+                              CustomTextField(
+                                label: 'Téléphone',
+                                hintText: '+237 6XX XXX XXX',
+                                prefixIcon: Icons.phone,
+                                controller: _phoneController,
+                                keyboardType: TextInputType.phone,
+                                validator: (v) => v!.isEmpty ? 'Requis' : null,
+                              ),
+                              const SizedBox(height: 16),
+
+                              CustomTextField(
+                                label: 'Adresse',
+                                hintText: 'Adresse complète',
+                                prefixIcon: Icons.location_on,
+                                controller: _addressController,
+                                validator: (v) => v!.isEmpty ? 'Requis' : null,
+                              ),
+                              const SizedBox(height: 24),
+
+                              // ── Section CHAUFFEUR ────────────────────────
+                              if (role == UserRole.CHAUFFEUR) ...[
+                                const _SectionTitle(
+                                  icon: Icons.card_membership_outlined,
+                                  label: 'Informations permis',
+                                ),
+                                const SizedBox(height: 12),
+
+                                CustomTextField(
+                                  label: 'Numéro de permis',
+                                  hintText: 'Ex : CM-2019-004512',
+                                  prefixIcon: Icons.card_membership,
+                                  controller: _permisNumController,
+                                  validator: (v) => v!.isEmpty ? 'Requis' : null,
+                                ),
+                                const SizedBox(height: 16),
+
+                                CustomTextField(
+                                  label: 'Catégorie de permis',
+                                  hintText: 'Ex : B, C, D, CE...',
+                                  prefixIcon: Icons.category,
+                                  controller: _permisCatController,
+                                  validator: (v) => v!.isEmpty ? 'Requis' : null,
+                                ),
+                                const SizedBox(height: 16),
+
+                                // date_expiration_permis — DATE NOT NULL
+                                _DatePickerField(
+                                  label: 'Date d\'expiration du permis',
+                                  selectedDate: _dateExpirationPermis,
+                                  isRequired: true,
+                                  onTap: _pickExpirationDate,
+                                ),
+                                const SizedBox(height: 16),
+
+                                // km_cumule — INTEGER NOT NULL DEFAULT 0
+                                CustomTextField(
+                                  label: 'Kilométrage cumulé',
+                                  hintText: '0',
+                                  prefixIcon: Icons.speed_outlined,
+                                  controller: _kmCumuleController,
+                                  keyboardType: TextInputType.number,
+                                  validator: (v) {
+                                    if (v == null || v.isEmpty) return null;
+                                    if (int.tryParse(v) == null) {
+                                      return 'Valeur numérique requise';
+                                    }
+                                    return null;
+                                  },
+                                ),
+                                const SizedBox(height: 24),
+                              ],
+
+                              // ── Section TECHNICIEN ───────────────────────
+                              if (role == UserRole.TECHNICIEN) ...[
+                                const _SectionTitle(
+                                  icon: Icons.build_outlined,
+                                  label: 'Informations technicien',
+                                ),
+                                const SizedBox(height: 12),
+
+                                CustomTextField(
+                                  label: 'Matricule',
+                                  hintText: 'Matricule employé',
+                                  prefixIcon: Icons.badge,
+                                  controller: _matriculeController,
+                                  validator: (v) => v!.isEmpty ? 'Requis' : null,
+                                ),
+                                const SizedBox(height: 16),
+
+                                CustomTextField(
+                                  label: 'Spécialité',
+                                  hintText: 'Ex : Mécanique, Électricité...',
+                                  prefixIcon: Icons.settings,
+                                  controller: _specialiteController,
+                                  validator: (v) => v!.isEmpty ? 'Requis' : null,
+                                ),
+                                const SizedBox(height: 24),
+                              ],
+
+                              // ── Erreur API ───────────────────────────────
+                              if (authState.error != null) ...[
+                                Container(
+                                  padding: const EdgeInsets.all(12),
+                                  decoration: BoxDecoration(
+                                    color: Colors.red.shade50,
+                                    borderRadius: BorderRadius.circular(8),
+                                    border: Border.all(color: Colors.red.shade200),
+                                  ),
+                                  child: Row(
+                                    children: [
+                                      const Icon(Icons.error_outline,
+                                          color: Colors.red, size: 18),
+                                      const SizedBox(width: 8),
+                                      Expanded(
+                                        child: Text(
+                                          authState.error!,
+                                          style: const TextStyle(
+                                              color: Colors.red, fontSize: 13),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                const SizedBox(height: 16),
+                              ],
+
+                              // ── Bouton ───────────────────────────────────
+                              PrimaryButton(
+                                text: 'Enregistrer le profil',
+                                onPressed: _save,
+                                isLoading:
+                                authState.isLoading || _isPickingImage,
+                                prefixIcon: Icons.check,
+                              ),
+                            ],
                           ),
-                          const SizedBox(height: 16),
-
-                          _buildAnimated(
-                            index: 7,
-                            child: CustomTextField(
-                              label: "Adresse",
-                              hintText: "Adresse",
-                              prefixIcon: Icons.location_on,
-                              controller: _addressController,
-                              validator: (v) =>
-                              v!.isEmpty ? "Requis" : null,
-                            ),
-                          ),
-                          const SizedBox(height: 24),
-
-                          if (authState.error != null) ...[
-                            Text(
-                              authState.error!,
-                              style: const TextStyle(color: Colors.red),
-                              textAlign: TextAlign.center,
-                            ),
-                            const SizedBox(height: 8),
-                          ],
-
-                          _buildAnimated(
-                            index: 9,
-                            child: PrimaryButton(
-                              text: "Enregistrer le profil",
-                              onPressed: _saveProfile,
-                              isLoading:
-                              authState.isLoading || _isUploadingPhoto,
-                              prefixIcon: Icons.check,
-                            ),
-                          ),
-                        ],
+                        ),
                       ),
                     ),
                   ),
                 ),
               ),
+              const SizedBox(height: 32),
             ],
           ),
         ),
       ),
     );
   }
+}
 
-  Widget _buildAvatarPicker(User? user) {
+// ─────────────────────────────────────────────────────────────────────────────
+// WIDGET : Sélecteur de date (date_expiration_permis)
+// ─────────────────────────────────────────────────────────────────────────────
+
+class _DatePickerField extends StatelessWidget {
+  final String    label;
+  final DateTime? selectedDate;
+  final bool      isRequired;
+  final VoidCallback onTap;
+
+  const _DatePickerField({
+    required this.label,
+    required this.onTap,
+    this.selectedDate,
+    this.isRequired = false,
+  });
+
+  String get _displayValue {
+    if (selectedDate == null) return 'Sélectionner une date';
+    final d = selectedDate!;
+    return '${d.day.toString().padLeft(2, '0')}/'
+        '${d.month.toString().padLeft(2, '0')}/'
+        '${d.year}';
+  }
+
+  bool get _isExpired =>
+      selectedDate != null && selectedDate!.isBefore(DateTime.now());
+
+  @override
+  Widget build(BuildContext context) {
+    final isEmpty = selectedDate == null;
+    final borderColor = _isExpired
+        ? Colors.orange
+        : isEmpty && isRequired
+        ? Colors.red.shade300
+        : AppColors.border;
+    final textColor = isEmpty
+        ? AppColors.textHint
+        : _isExpired
+        ? Colors.orange.shade700
+        : AppColors.textPrimary;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          label,
+          style: const TextStyle(
+            fontSize: 13,
+            fontWeight: FontWeight.w500,
+            color: AppColors.textSecondary,
+          ),
+        ),
+        const SizedBox(height: 6),
+        GestureDetector(
+          onTap: onTap,
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+            decoration: BoxDecoration(
+              color: AppColors.white,
+              borderRadius: BorderRadius.circular(AppDimensions.radiusMedium),
+              border: Border.all(color: borderColor),
+            ),
+            child: Row(
+              children: [
+                Icon(Icons.calendar_today_outlined,
+                    size: 18,
+                    color: _isExpired ? Colors.orange : AppColors.textSecondary),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    _displayValue,
+                    style: TextStyle(
+                      fontSize: AppDimensions.fontSM,
+                      color: textColor,
+                    ),
+                  ),
+                ),
+                if (_isExpired)
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 8, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: Colors.orange.shade50,
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(color: Colors.orange.shade200),
+                    ),
+                    child: const Text(
+                      'Expiré',
+                      style: TextStyle(
+                          fontSize: 11,
+                          color: Colors.orange,
+                          fontWeight: FontWeight.bold),
+                    ),
+                  ),
+              ],
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// WIDGETS INTERNES
+// ─────────────────────────────────────────────────────────────────────────────
+
+class _AvatarPicker extends StatelessWidget {
+  final User?      user;
+  final File?      imageFile;
+  final Uint8List? imageBytes;
+  final bool       isLoading;
+  final VoidCallback onTap;
+
+  const _AvatarPicker({
+    required this.user,
+    required this.isLoading,
+    required this.onTap,
+    this.imageFile,
+    this.imageBytes,
+  });
+
+  @override
+  Widget build(BuildContext context) {
     return Center(
       child: Column(
         children: [
           GestureDetector(
-            onTap: kIsWeb ? () => _pickImage(ImageSource.gallery) : _showPhotoSourceSheet,
+            onTap: onTap,
             child: Stack(
               clipBehavior: Clip.none,
               children: [
                 UserAvatar(
                   user: user,
                   radius: 52,
-                  localImage: _imageFile,
-                  localBytes: _webImageBytes,
+                  localImage: imageFile,
+                  localBytes: imageBytes,
                   showBorder: true,
                   borderColor: const Color(0xFF1A6B3A).withOpacity(0.2),
                 ),
@@ -520,10 +736,11 @@ class _ProfilePageState extends ConsumerState<ProfilePage>
                       shape: BoxShape.circle,
                       border: Border.all(color: Colors.white, width: 2),
                     ),
-                    child: const Icon(Icons.camera_alt, color: Colors.white, size: 16),
+                    child: const Icon(Icons.camera_alt,
+                        color: Colors.white, size: 16),
                   ),
                 ),
-                if (_isUploadingPhoto)
+                if (isLoading)
                   Positioned.fill(
                     child: Container(
                       decoration: BoxDecoration(
@@ -531,7 +748,8 @@ class _ProfilePageState extends ConsumerState<ProfilePage>
                         shape: BoxShape.circle,
                       ),
                       child: const Center(
-                        child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
+                        child: CircularProgressIndicator(
+                            color: Colors.white, strokeWidth: 2),
                       ),
                     ),
                   ),
@@ -539,56 +757,78 @@ class _ProfilePageState extends ConsumerState<ProfilePage>
             ),
           ),
           const SizedBox(height: 8),
+          Text('Appuyer pour changer la photo',
+              style: TextStyle(fontSize: 12, color: Colors.grey.shade500)),
+        ],
+      ),
+    );
+  }
+}
+
+class _RoleBadge extends StatelessWidget {
+  final UserRole role;
+
+  const _RoleBadge({required this.role});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+      decoration: BoxDecoration(
+        color: const Color(0xFF1A6B3A).withOpacity(0.06),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: const Color(0xFF1A6B3A).withOpacity(0.2)),
+      ),
+      child: Row(
+        children: [
+          const Icon(Icons.shield_outlined,
+              size: 18, color: Color(0xFF1A6B3A)),
+          const SizedBox(width: 10),
           Text(
-            'Appuyer pour changer la photo',
-            style: TextStyle(fontSize: 12, color: Colors.grey.shade500),
+            'Rôle : ${role.label}',
+            style: const TextStyle(
+              fontWeight: FontWeight.w600,
+              fontSize: 14,
+              color: Color(0xFF1A6B3A),
+            ),
+          ),
+          const Spacer(),
+          const Tooltip(
+            message: 'Le rôle est attribué par un administrateur',
+            child: Icon(Icons.lock_outline,
+                size: 14, color: Color(0xFF1A6B3A)),
           ),
         ],
       ),
     );
   }
+}
 
-  Widget _buildRoleDropdown() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
+class _SectionTitle extends StatelessWidget {
+  final IconData icon;
+  final String   label;
+
+  const _SectionTitle({required this.icon, required this.label});
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
       children: [
-        const Text(
-          "Votre rôle",
-          style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
-        ),
-        const SizedBox(height: 8),
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 12),
-          decoration: BoxDecoration(
-            color: AppColors.surface,
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: AppColors.border, width: 1.5),
-          ),
-          child: DropdownButtonHideUnderline(
-            child: DropdownButton<UserRole>(
-              value: _selectedRole,
-              isExpanded: true,
-              items: UserRole.values
-                  .map((r) => DropdownMenuItem(
-                value: r,
-                child: Text(r.label),
-              ))
-                  .toList(),
-              onChanged: (v) => setState(() => _selectedRole = v!),
-            ),
+        Icon(icon, size: 16, color: const Color(0xFF1A6B3A)),
+        const SizedBox(width: 8),
+        Text(
+          label.toUpperCase(),
+          style: const TextStyle(
+            fontSize: 11,
+            fontWeight: FontWeight.bold,
+            color: Color(0xFF1A6B3A),
+            letterSpacing: 1.1,
           ),
         ),
+        const SizedBox(width: 8),
+        const Expanded(child: Divider(height: 1)),
       ],
-    );
-  }
-
-  Widget _buildAnimated({required int index, required Widget child}) {
-    return SlideTransition(
-      position: _slideAnimations[index],
-      child: FadeTransition(
-        opacity: _fadeAnimations[index],
-        child: child,
-      ),
     );
   }
 }

@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/constants/app_colors.dart';
-import '../../../../routes/app_routes.dart';
+import '../../../auth/presentation/providers/auth_notifier.dart';
 import '../providers/vehicle_notifier.dart';
 import '../widgets/vehicle_card.dart';
 
@@ -132,13 +132,15 @@ class _VehicleListPageState extends ConsumerState<VehicleListPage> {
           ],
         ),
       ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: () {
-          Navigator.pushNamed(context, '/vehicles/add');
-        },
-        backgroundColor: AppColors.primary,
-        child: const Icon(Icons.add, color: Colors.white),
-      ),
+      floatingActionButton: (ref.watch(authProvider).user?.isAdmin ?? false)
+          ? FloatingActionButton(
+              onPressed: () {
+                Navigator.pushNamed(context, '/vehicles/add');
+              },
+              backgroundColor: AppColors.primary,
+              child: const Icon(Icons.add, color: Colors.white),
+            )
+          : null,
     );
   }
 }

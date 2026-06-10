@@ -41,6 +41,13 @@ dependencies:
   fl_chart: ^1.2.0
   image_picker: ^1.2.1
   image_picker_for_web: ^3.0.5
+  http_parser: ^4.1.2
+  intl: ^0.20.2
+  geolocator: ^13.0.2
+  geocoding: ^3.0.0
+  flutter_map: ^7.0.2
+  latlong2: ^0.9.1
+  url_launcher: ^6.3.1
 
 dev_dependencies:
   flutter_test:

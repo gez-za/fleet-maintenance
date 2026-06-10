@@ -33,3 +33,24 @@ enum PanneStatus {
     PanneStatus.CLOTUREE      => 'Clôturée',
   };
 }
+
+enum WorkOrderStatus {
+  CREE,
+  EN_COURS,
+  TERMINE,
+  ANNULE;
+
+  String get label => switch (this) {
+    WorkOrderStatus.CREE     => 'Créé',
+    WorkOrderStatus.EN_COURS => 'En cours',
+    WorkOrderStatus.TERMINE  => 'Terminé',
+    WorkOrderStatus.ANNULE   => 'Annulé',
+  };
+
+  Color get color => switch (this) {
+    WorkOrderStatus.CREE     => Colors.grey,
+    WorkOrderStatus.EN_COURS => Colors.blue,
+    WorkOrderStatus.TERMINE  => Colors.green,
+    WorkOrderStatus.ANNULE   => Colors.red,
+  };
+}

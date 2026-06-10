@@ -1,6 +1,6 @@
-/// ============================================================
-/// AutoPark IUC - Page d'Inscription
-/// ============================================================
+// ============================================================
+// AutoPark IUC - Page d'Inscription
+// ============================================================
 
 import 'package:flutter/material.dart';
 import 'package:flutter/gestures.dart';
@@ -137,6 +137,7 @@ class _RegisterPageState extends ConsumerState<RegisterPage>
             prenom: _prenomController.text.trim(),
             email: _emailController.text.trim(),
             password: _passwordController.text,
+            confirmPassword: _confirmPasswordController.text,
             role: _selectedRole,
             telephone: _phoneController.text.trim(),
           );
@@ -153,7 +154,7 @@ class _RegisterPageState extends ConsumerState<RegisterPage>
           ),
         );
         
-        Navigator.of(context).pushReplacementNamed('/dashboard');
+        Navigator.of(context).pushNamedAndRemoveUntil('/dashboard', (route) => false);
       } else {
         setState(() {
           _globalError = authState.error;
@@ -199,7 +200,7 @@ class _RegisterPageState extends ConsumerState<RegisterPage>
                   child: Column(
                     children: [
 
-                      const SizedBox(height: AppDimensions.space32),
+                      const SizedBox(height: 16),
 
                       _buildAnimated(
                         index: 1,
@@ -234,7 +235,7 @@ class _RegisterPageState extends ConsumerState<RegisterPage>
                         ),
                       ),
 
-                      const SizedBox(height: AppDimensions.space20),
+                      const SizedBox(height: 12),
 
                       _buildAnimated(
                         index: 2,
@@ -250,7 +251,7 @@ class _RegisterPageState extends ConsumerState<RegisterPage>
                         ),
                       ),
 
-                      const SizedBox(height: AppDimensions.space20),
+                      const SizedBox(height: 12),
 
                       _buildAnimated(
                         index: 3,
@@ -266,14 +267,14 @@ class _RegisterPageState extends ConsumerState<RegisterPage>
                         ),
                       ),
 
-                      const SizedBox(height: AppDimensions.space20),
+                      const SizedBox(height: 12),
 
                       _buildAnimated(
                         index: 4,
                         child: _buildRoleDropdown(),
                       ),
 
-                      const SizedBox(height: AppDimensions.space20),
+                      const SizedBox(height: 12),
 
                       _buildAnimated(
                         index: 5,
@@ -291,7 +292,7 @@ class _RegisterPageState extends ConsumerState<RegisterPage>
                         ),
                       ),
 
-                      const SizedBox(height: AppDimensions.space20),
+                      const SizedBox(height: 12),
 
                       _buildAnimated(
                         index: 6,
@@ -304,9 +305,9 @@ class _RegisterPageState extends ConsumerState<RegisterPage>
                           focusNode: _confirmPasswordFocus,
                           textInputAction: TextInputAction.done,
                           onSubmitted: (_) => _handleRegister(),
-                          validator: AppValidators
+                          validator: (value) => AppValidators
                               .validateConfirmPassword(
-                              _passwordController.text),
+                              value, _passwordController.text),
                         ),
                       ),
 
@@ -338,11 +339,11 @@ class _RegisterPageState extends ConsumerState<RegisterPage>
                         ),
                       ),
 
-                      const SizedBox(height: AppDimensions.space20),
+                      const SizedBox(height: 12),
 
                       _buildLoginLink(),
 
-                      const SizedBox(height: AppDimensions.space40),
+                      const SizedBox(height: 20),
                     ],
                   ),
                 ),

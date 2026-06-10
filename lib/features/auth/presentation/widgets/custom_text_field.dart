@@ -107,11 +107,11 @@ class _CustomTextFieldState extends State<CustomTextField>
       children: [
         // ── Label ───────────────────────────────────────
         Padding(
-          padding: const EdgeInsets.only(bottom: AppDimensions.space8),
+          padding: const EdgeInsets.only(bottom: 6),
           child: Text(
             widget.label,
             style: TextStyle(
-              fontSize:   AppDimensions.fontBase,
+              fontSize:   13,
               fontWeight: FontWeight.w600,
               fontFamily: 'Poppins',
               color: _isFocused ? AppColors.primary : AppColors.textPrimary,
@@ -123,7 +123,6 @@ class _CustomTextFieldState extends State<CustomTextField>
         ScaleTransition(
           scale: _scaleAnim,
           child: Container(
-            height: AppDimensions.inputHeight,
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(AppDimensions.radiusMedium),
               boxShadow: _isFocused
@@ -159,7 +158,7 @@ class _CustomTextFieldState extends State<CustomTextField>
               onChanged:          widget.onChanged,
               onFieldSubmitted:   widget.onSubmitted,
               style: const TextStyle(
-                fontSize:   AppDimensions.fontBase,
+                fontSize:   14,
                 fontWeight: FontWeight.w500,
                 fontFamily: 'Poppins',
                 color:      AppColors.textPrimary,
@@ -167,23 +166,24 @@ class _CustomTextFieldState extends State<CustomTextField>
               decoration: InputDecoration(
                 hintText:  widget.hintText,
                 errorText: widget.errorText,
+                hintStyle: const TextStyle(fontSize: 14, color: AppColors.textHint),
 
                 // Icône préfixe
                 prefixIcon: Container(
                   padding: const EdgeInsets.symmetric(
-                    horizontal: AppDimensions.space16,
+                    horizontal: 12,
                   ),
                   child: Icon(
                     widget.prefixIcon,
-                    size:  AppDimensions.iconSize,
+                    size:  20,
                     color: _isFocused
                         ? AppColors.primary
                         : AppColors.textHint,
                   ),
                 ),
                 prefixIconConstraints: const BoxConstraints(
-                  minWidth: 52,
-                  minHeight: AppDimensions.inputHeight,
+                  minWidth: 44,
+                  minHeight: 48,
                 ),
 
                 // Icône suffixe
@@ -214,8 +214,8 @@ class _CustomTextFieldState extends State<CustomTextField>
                   borderSide:   const BorderSide(color: AppColors.danger, width: 2.0),
                 ),
                 contentPadding: const EdgeInsets.symmetric(
-                  horizontal: AppDimensions.space16,
-                  vertical:   AppDimensions.space16,
+                  horizontal: 12,
+                  vertical:   12,
                 ),
               ),
             ),
@@ -230,7 +230,7 @@ class _CustomTextFieldState extends State<CustomTextField>
       onTap: () => setState(() => _obscureText = !_obscureText),
       child: Padding(
         padding: const EdgeInsets.symmetric(
-          horizontal: AppDimensions.space16,
+          horizontal: 12,
         ),
         child: AnimatedSwitcher(
           duration: const Duration(milliseconds: 200),
@@ -239,7 +239,7 @@ class _CustomTextFieldState extends State<CustomTextField>
             _obscureText
                 ? Icons.visibility_off_outlined
                 : Icons.visibility_outlined,
-            size:  AppDimensions.iconSize,
+            size:  20,
             color: _isFocused ? AppColors.primary : AppColors.textHint,
           ),
         ),
