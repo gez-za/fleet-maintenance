@@ -22,29 +22,35 @@ enum DemandeType {
 }
 
 enum DemandeStatus {
-  BROUILLON,
-  EN_ATTENTE,
-  VALIDEE,
+  CREEE,
+  VALIDEE_ATELIER,
+  VALIDEE_DIRECTION,
+  BON_GENERE,
+  DECAISSEE,
   REJETEE,
   ANNULEE,
-  CLOTUREE;
+  TERMINEE;
 
   String get label => switch (this) {
-    DemandeStatus.BROUILLON   => 'Brouillon',
-    DemandeStatus.EN_ATTENTE  => 'En attente',
-    DemandeStatus.VALIDEE     => 'Validée',
-    DemandeStatus.REJETEE     => 'Rejetée',
-    DemandeStatus.ANNULEE     => 'Annulée',
-    DemandeStatus.CLOTUREE    => 'Clôturée',
+    DemandeStatus.CREEE            => 'Créée',
+    DemandeStatus.VALIDEE_ATELIER   => 'Validée Atelier',
+    DemandeStatus.VALIDEE_DIRECTION => 'Validée Direction',
+    DemandeStatus.BON_GENERE       => 'Bon Généré',
+    DemandeStatus.DECAISSEE        => 'Déccaissée',
+    DemandeStatus.REJETEE          => 'Rejetée',
+    DemandeStatus.ANNULEE          => 'Annulée',
+    DemandeStatus.TERMINEE         => 'Terminée',
   };
 
   Color get color => switch (this) {
-    DemandeStatus.BROUILLON   => Colors.grey,
-    DemandeStatus.EN_ATTENTE  => Colors.orange,
-    DemandeStatus.VALIDEE     => Colors.green,
-    DemandeStatus.REJETEE     => Colors.red,
-    DemandeStatus.ANNULEE     => Colors.blueGrey,
-    DemandeStatus.CLOTUREE    => Colors.blue,
+    DemandeStatus.CREEE            => Colors.orange,
+    DemandeStatus.VALIDEE_ATELIER   => Colors.blue,
+    DemandeStatus.VALIDEE_DIRECTION => Colors.indigo,
+    DemandeStatus.BON_GENERE       => Colors.purple,
+    DemandeStatus.DECAISSEE        => Colors.teal,
+    DemandeStatus.REJETEE          => Colors.red,
+    DemandeStatus.ANNULEE          => Colors.blueGrey,
+    DemandeStatus.TERMINEE         => Colors.green,
   };
 }
 

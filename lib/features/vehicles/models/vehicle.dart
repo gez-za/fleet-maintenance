@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../../core/utils/parser_utils.dart';
 
 // ============================================================
 // ENUM : vehicule_categorie  (PostgreSQL)
@@ -98,6 +99,10 @@ class Vehicle {
   final VehicleCategorie categorie;        // categorie  (ENUM vehicule_categorie)
   final VehicleStatut    statut;           // statut    (ENUM vehicule_statut)
   final int              kmActuel;         // km_actuel  (INTEGER DEFAULT 0)
+  final String?          chauffeurName;    // Ajouté via JOIN API
+  final String?          chauffeurNom;
+  final String?          chauffeurPrenom;
+  final String?          affectationId;
   final DateTime?        createdAt;
   final DateTime?        updatedAt;
 
@@ -112,6 +117,10 @@ class Vehicle {
     required this.categorie,
     required this.statut,
     this.kmActuel = 0,
+    this.chauffeurName,
+    this.chauffeurNom,
+    this.chauffeurPrenom,
+    this.affectationId,
     this.createdAt,
     this.updatedAt,
   });
@@ -124,12 +133,18 @@ class Vehicle {
     immatriculation: json['immatriculation'] ?? '',
     marque:          json['marque']          ?? '',
     modele:          json['modele']          ?? '',
-    annee:           (json['annee']   as num?)?.toInt() ?? 0,
+    annee:           ParserUtils.parseInt(json['annee']) ?? 0,
     image:           json['image'],
     numeroChassis:   json['numero_chassis'],
     categorie:       VehicleCategorie.fromString(json['categorie']),
     statut:          VehicleStatut.fromString(json['statut']),
-    kmActuel:        (json['km_actuel'] as num?)?.toInt() ?? 0,
+    kmActuel:        ParserUtils.parseInt(json['km_actuel']) ?? 0,
+    chauffeurName:   json['chauffeur'] != null 
+        ? '${json['chauffeur']['prenom'] ?? ""} ${json['chauffeur']['nom'] ?? ""}'.trim()
+        : json['chauffeur_name'],
+    chauffeurNom:    json['chauffeur']?['nom'] ?? json['chauffeur_nom'],
+    chauffeurPrenom: json['chauffeur']?['prenom'] ?? json['chauffeur_prenom'],
+    affectationId:   json['chauffeur']?['affectation_id']?.toString() ?? json['affectation_id']?.toString(),
     createdAt:       json['created_at'] != null
         ? DateTime.tryParse(json['created_at'])
         : null,
@@ -152,6 +167,7 @@ class Vehicle {
     'categorie':       categorie.name,  // ex: "SERVICE"
     'statut':          statut.name,     // ex: "DISPONIBLE"
     'km_actuel':       kmActuel,
+    'chauffeur_id':    affectationId, // Parfois utilisé pour l'affectation
   };
 
   // ----------------------------------------------------------
@@ -168,6 +184,10 @@ class Vehicle {
     VehicleCategorie? categorie,
     VehicleStatut?    statut,
     int?              kmActuel,
+    String?           chauffeurName,
+    String?           chauffeurNom,
+    String?           chauffeurPrenom,
+    String?           affectationId,
     DateTime?         createdAt,
     DateTime?         updatedAt,
   }) =>
@@ -182,6 +202,10 @@ class Vehicle {
         categorie:       categorie       ?? this.categorie,
         statut:          statut          ?? this.statut,
         kmActuel:        kmActuel        ?? this.kmActuel,
+        chauffeurName:   chauffeurName   ?? this.chauffeurName,
+        chauffeurNom:    chauffeurNom    ?? this.chauffeurNom,
+        chauffeurPrenom: chauffeurPrenom ?? this.chauffeurPrenom,
+        affectationId:   affectationId   ?? this.affectationId,
         createdAt:       createdAt       ?? this.createdAt,
         updatedAt:       updatedAt       ?? this.updatedAt,
       );

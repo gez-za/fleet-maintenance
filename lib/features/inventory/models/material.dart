@@ -1,4 +1,5 @@
 import 'package:equatable/equatable.dart';
+import '../../../core/utils/parser_utils.dart';
 
 class MaterialModel extends Equatable {
   final String id;
@@ -25,8 +26,8 @@ class MaterialModel extends Equatable {
       reference: json['reference'] ?? '',
       designation: json['designation'] ?? '',
       categorie: json['categorie'] ?? '',
-      quantiteStock: (json['quantite_stock'] ?? 0).toDouble(),
-      seuilAlerte: (json['seuil_alerte'] ?? 0).toDouble(),
+      quantiteStock: ParserUtils.parseDouble(json['quantite_stock']) ?? 0.0,
+      seuilAlerte: ParserUtils.parseDouble(json['seuil_alerte']) ?? 0.0,
     );
   }
 

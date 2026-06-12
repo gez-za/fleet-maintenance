@@ -20,16 +20,16 @@ enum PanneCriticite {
 
 enum PanneStatus {
   DECLAREE,
-  VALIDEE,
   EN_DIAGNOSTIC,
-  EN_REPARATION,
+  VALIDEE,
+  EN_COURS,
   CLOTUREE;
 
   String get label => switch (this) {
     PanneStatus.DECLAREE      => 'Déclarée',
-    PanneStatus.VALIDEE       => 'Validée',
     PanneStatus.EN_DIAGNOSTIC => 'En Diagnostic',
-    PanneStatus.EN_REPARATION => 'En Réparation',
+    PanneStatus.VALIDEE       => 'Validée',
+    PanneStatus.EN_COURS      => 'En Cours',
     PanneStatus.CLOTUREE      => 'Clôturée',
   };
 }

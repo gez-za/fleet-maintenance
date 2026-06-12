@@ -11,6 +11,7 @@ import '../widgets/placeholder_tabs.dart';
 import '../../../auth/presentation/providers/auth_notifier.dart';
 
 import '../../../users/presentation/pages/user_list_page.dart';
+import '../../../users/presentation/pages/chauffeur_list_page.dart';
 import '../../../faults/presentation/pages/fault_list_page.dart';
 import '../../../work_orders/presentation/pages/work_order_list_page.dart';
 import '../../../requests/presentation/pages/demandes_page.dart';
@@ -37,7 +38,7 @@ class _DashboardPageState extends ConsumerState<DashboardPage> {
 
   static const _tabs = <Widget>[
     HomeTab(),         VehicleListPage(),     FaultListPage(),
-    WorkOrderListPage(),      DemandesPage(),    ChauffeursTab(),
+    WorkOrderListPage(),      DemandesPage(),    ChauffeurListPage(),
     MaterielsScreen(),    FournisseursScreen(), UserListPage(),
   ];
 

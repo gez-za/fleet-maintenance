@@ -34,7 +34,9 @@ class VehicleService {
   Future<Vehicle> getVehicleById(String id) async {
     try {
       final response = await _api.get('${ApiEndpoints.vehicules}/$id');
-      return Vehicle.fromJson(response.data['data']);
+      final dynamic data = response.data['data'];
+      final dynamic vehicleData = data['vehicle'] ?? data['vehicule'] ?? data;
+      return Vehicle.fromJson(vehicleData);
     } catch (e) {
       rethrow;
     }
@@ -88,6 +90,33 @@ class VehicleService {
   Future<void> deleteVehicle(String id) async {
     try {
       await _api.delete('${ApiEndpoints.vehicules}/$id');
+    } catch (e) {
+      rethrow;
+    }
+  }
+
+  // ── Affectations ───────────────────────────────────────────────────────────
+
+  Future<void> affecterChauffeur(String vehicleId, String chauffeurId) async {
+    try {
+      await _api.post('${ApiEndpoints.vehicules}/$vehicleId/affecter', data: {
+        'chauffeur_id': chauffeurId,
+      });
+    } catch (e) {
+      rethrow;
+    }
+  }
+
+  Future<List<dynamic>> getAffectations(String vehicleId) async {
+    try {
+      final response = await _api.get('${ApiEndpoints.vehicules}/$vehicleId/affectations');
+      final data = response.data['data'];
+      if (data is Map && data.containsKey('affectations')) {
+        return data['affectations'] ?? [];
+      } else if (data is List) {
+        return data;
+      }
+      return [];
     } catch (e) {
       rethrow;
     }

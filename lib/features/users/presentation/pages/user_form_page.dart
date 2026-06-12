@@ -70,7 +70,7 @@ class _UserFormPageState extends ConsumerState<UserFormPage> {
       if (_selectedRole == UserRole.TECHNICIEN) {
         userData['matricule'] = _matriculeController.text.trim();
         userData['specialite'] = _specialiteController.text.trim();
-      } else if (_selectedRole == UserRole.CHAUFFEUR) {
+      } else if (_selectedRole == UserRole.CHAUFFEUR || _selectedRole == UserRole.CHEF_CHAUFFEUR) {
         userData['numero_permis'] = _permisController.text.trim();
       }
 
@@ -168,7 +168,7 @@ class _UserFormPageState extends ConsumerState<UserFormPage> {
                   prefixIcon: Icons.handyman_outlined,
                   controller: _specialiteController,
                 ),
-              ] else if (_selectedRole == UserRole.CHAUFFEUR) ...[
+              ] else if (_selectedRole == UserRole.CHAUFFEUR || _selectedRole == UserRole.CHEF_CHAUFFEUR) ...[
                 CustomTextField(
                   label: 'Numéro de Permis',
                   hintText: 'Ex: PER-123456',

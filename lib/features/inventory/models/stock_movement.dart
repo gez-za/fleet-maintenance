@@ -1,4 +1,5 @@
 import 'package:equatable/equatable.dart';
+import '../../../core/utils/parser_utils.dart';
 
 enum MovementType { ENTREE, SORTIE, AJUSTEMENT }
 
@@ -29,15 +30,17 @@ class StockMovement extends Equatable {
     return StockMovement(
       id: json['id'] ?? '',
       materielId: json['materiel_id'] ?? '',
-      materielDesignation: json['materiel_designation'] ?? json['materiel']?['designation'],
+      materielDesignation: json['materiel']?['designation'] ?? json['materiel_designation'],
       type: _parseType(json['type']),
-      quantite: (json['quantite'] ?? 0).toDouble(),
+      quantite: ParserUtils.parseDouble(json['quantite']) ?? 0.0,
       motif: json['motif'] ?? '',
       otId: json['ot_id'],
       createdAt: json['created_at'] != null 
           ? DateTime.parse(json['created_at']) 
           : DateTime.now(),
-      userName: json['user_name'] ?? json['user']?['nom'],
+      userName: json['operateur'] != null 
+          ? '${json['operateur']['prenom'] ?? ""} ${json['operateur']['nom'] ?? ""}'.trim()
+          : (json['user']?['nom'] ?? json['user_name']),
     );
   }
 

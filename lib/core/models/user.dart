@@ -10,7 +10,8 @@ enum UserRole {
   DIRECTEUR,
   CHEF_ATELIER,
   TECHNICIEN,
-  CHAUFFEUR;
+  CHAUFFEUR,
+  CHEF_CHAUFFEUR;
 
   static UserRole fromString(String value) {
     return UserRole.values.firstWhere(
@@ -25,6 +26,7 @@ enum UserRole {
     UserRole.TECHNICIEN    => 'Technicien',
     UserRole.DIRECTEUR     => 'Directeur',
     UserRole.CHEF_ATELIER  => 'Chef d\'Atelier',
+    UserRole.CHEF_CHAUFFEUR => 'Chef Chauffeur',
   };
 
   bool get isAdmin => this == UserRole.ADMIN;
@@ -35,6 +37,7 @@ enum UserRole {
     UserRole.TECHNICIEN    => Icons.build_outlined,
     UserRole.DIRECTEUR     => Icons.person_pin_outlined,
     UserRole.CHEF_ATELIER  => Icons.engineering_outlined,
+    UserRole.CHEF_CHAUFFEUR => Icons.badge_outlined,
   };
 }
 
@@ -56,12 +59,12 @@ class UserProfile {
   });
 
   factory UserProfile.fromJson(Map<String, dynamic> json) => UserProfile(
-    id: json['id'] as String,
-    nom: json['nom'] as String? ?? '',
-    prenom: json['prenom'] as String? ?? '',
-    telephone: json['telephone'] as String?,
-    adresse: json['adresse'] as String?,
-    photoUrl: (json['photo_url'] ?? json['photoUrl']) as String?,
+    id: (json['id'] ?? json['uuid'])?.toString() ?? '',
+    nom: json['nom']?.toString() ?? '',
+    prenom: json['prenom']?.toString() ?? '',
+    telephone: json['telephone']?.toString(),
+    adresse: json['adresse']?.toString(),
+    photoUrl: (json['photo_url'] ?? json['photoUrl'])?.toString(),
   );
 
   Map<String, dynamic> toJson() => {
@@ -109,16 +112,25 @@ class User {
            p.adresse != null && p.adresse!.isNotEmpty;
   }
 
-  factory User.fromJson(Map<String, dynamic> json) => User(
-    uuid: json['uuid'] as String,
-    email: json['email'] as String,
-    role: UserRole.fromString(json['role'] as String? ?? 'CHAUFFEUR'),
-    isActive: (json['is_active'] ?? json['isActive']) as bool? ?? true,
-    profile: json['profile'] != null 
-        ? UserProfile.fromJson(json['profile'] as Map<String, dynamic>) 
-        : null,
-    roleInfo: json['role_info'] as Map<String, dynamic>?,
-  );
+  factory User.fromJson(Map<String, dynamic> json) {
+    // Le profil peut être soit dans un objet 'profile' imbriqué,
+    // soit à la racine de l'objet utilisateur (données "à plat").
+    UserProfile? userProfile;
+    if (json['profile'] != null) {
+      userProfile = UserProfile.fromJson(json['profile'] as Map<String, dynamic>);
+    } else if (json.containsKey('nom') || json.containsKey('prenom')) {
+      userProfile = UserProfile.fromJson(json);
+    }
+
+    return User(
+      uuid: (json['uuid'] ?? json['id'])?.toString() ?? '',
+      email: json['email']?.toString() ?? '',
+      role: UserRole.fromString(json['role'] as String? ?? 'CHAUFFEUR'),
+      isActive: (json['is_active'] ?? json['isActive']) as bool? ?? true,
+      profile: userProfile,
+      roleInfo: json['role_info'] as Map<String, dynamic>?,
+    );
+  }
 
   Map<String, dynamic> toJson() => {
     'uuid': uuid,

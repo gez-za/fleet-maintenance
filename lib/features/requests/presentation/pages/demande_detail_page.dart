@@ -18,10 +18,7 @@ class DemandeDetailPage extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final user = ref.watch(authProvider).user;
-    final canValidate = user?.role == UserRole.ADMIN || 
-                        user?.role == UserRole.CHEF_ATELIER || 
-                        user?.role == UserRole.DIRECTEUR;
-
+    
     return Scaffold(
       appBar: AppBar(title: const Text('Détail de la Demande')),
       body: SingleChildScrollView(
@@ -31,161 +28,156 @@ class DemandeDetailPage extends ConsumerWidget {
           children: [
             _buildStatusHeader(),
             const SizedBox(height: 24),
+            if (demande.bonNumber != null) _buildCouponCard(),
+            const SizedBox(height: 24),
             _buildInfoCard(),
             const SizedBox(height: 24),
             _buildDetailsCard(),
             const SizedBox(height: 24),
             if (demande.justificatif != null) _buildJustificatifCard(),
             const SizedBox(height: 40),
-            if (canValidate && demande.status == DemandeStatus.EN_ATTENTE) _buildValidationActions(context, ref),
+            _buildDynamicActions(context, ref, user),
           ],
         ),
       ),
     );
   }
 
-  Widget _buildStatusHeader() {
+  Widget _buildCouponCard() {
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: demande.status.color.withOpacity(0.1),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: demande.status.color.withOpacity(0.5)),
+        color: Colors.purple.withOpacity(0.05),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: Colors.purple.withOpacity(0.3)),
       ),
       child: Column(
         children: [
-          Icon(demande.type.icon, size: 48, color: demande.status.color),
-          const SizedBox(height: 8),
-          Text(
-            demande.status.label.toUpperCase(),
-            style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: demande.status.color),
+          const Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(Icons.confirmation_number_outlined, color: Colors.purple),
+              SizedBox(width: 8),
+              Text('COUPON / BON GÉNÉRÉ', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.purple)),
+            ],
           ),
-          if (demande.rejectionReason != null) ...[
-            const Divider(),
-            Text('Motif du rejet:', style: const TextStyle(fontWeight: FontWeight.bold)),
-            Text(demande.rejectionReason!),
-          ],
+          const Divider(height: 32),
+          Text(demande.bonNumber!, style: const TextStyle(fontSize: 28, fontWeight: FontWeight.bold, letterSpacing: 2)),
+          const SizedBox(height: 16),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceAround,
+            children: [
+              _buildCouponInfo('Quantité', '${demande.quantityGranted ?? demande.quantityEstimated ?? '--'}'),
+              _buildCouponInfo('Validité', demande.bonExpiryDate != null ? DateFormat('dd/MM/yy').format(demande.bonExpiryDate!) : '--'),
+            ],
+          ),
         ],
       ),
     );
   }
 
-  Widget _buildInfoCard() {
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text('INFORMATIONS GÉNÉRALES', style: TextStyle(fontWeight: FontWeight.bold, color: AppColors.textSecondary)),
-            const Divider(),
-            _buildInfoRow(Icons.info_outline, 'Motif', demande.motif),
-            _buildInfoRow(Icons.directions_car, 'Véhicule', demande.vehicle?.immatriculation ?? 'Non spécifié'),
-            _buildInfoRow(Icons.priority_high, 'Priorité', demande.priority.label, valueColor: demande.priority.color),
-            _buildInfoRow(Icons.person_outline, 'Demandeur', demande.requester?.displayName ?? 'Inconnu'),
-            _buildInfoRow(Icons.calendar_today, 'Date', DateFormat('dd/MM/yyyy HH:mm').format(demande.createdAt)),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildDetailsCard() {
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text('DÉTAILS SPÉCIFIQUES', style: TextStyle(fontWeight: FontWeight.bold, color: AppColors.textSecondary)),
-            const Divider(),
-            ...demande.details.entries.map((e) => _buildInfoRow(Icons.label_important_outline, _formatKey(e.key), e.value.toString())),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildJustificatifCard() {
-    final imageUrl = ApiConstants.getFullImageUrl(demande.justificatif);
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text('PIÈCE JOINTE', style: TextStyle(fontWeight: FontWeight.bold, color: AppColors.textSecondary)),
-            const Divider(),
-            if (imageUrl != null) Image.network(imageUrl, height: 200, width: double.infinity, fit: BoxFit.cover),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildValidationActions(BuildContext context, WidgetRef ref) {
-    return Row(
+  Widget _buildCouponInfo(String label, String value) {
+    return Column(
       children: [
-        Expanded(
-          child: ElevatedButton(
-            onPressed: () => _showValidationDialog(context, ref, true),
-            style: ElevatedButton.styleFrom(backgroundColor: Colors.green, foregroundColor: Colors.white),
-            child: const Text('APPROUVER'),
-          ),
-        ),
-        const SizedBox(width: 12),
-        Expanded(
-          child: ElevatedButton(
-            onPressed: () => _showValidationDialog(context, ref, false),
-            style: ElevatedButton.styleFrom(backgroundColor: Colors.red, foregroundColor: Colors.white),
-            child: const Text('REJETER'),
-          ),
-        ),
+        Text(label, style: const TextStyle(fontSize: 12, color: AppColors.textSecondary)),
+        Text(value, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
       ],
     );
   }
 
-  Widget _buildInfoRow(IconData icon, String label, String value, {Color? valueColor}) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 8),
-      child: Row(
-        children: [
-          Icon(icon, size: 20, color: AppColors.textHint),
-          const SizedBox(width: 12),
-          Text('$label:', style: const TextStyle(fontWeight: FontWeight.bold)),
-          const SizedBox(width: 8),
-          Expanded(child: Text(value, style: TextStyle(color: valueColor))),
-        ],
-      ),
+  Widget _buildDynamicActions(BuildContext context, WidgetRef ref, User? user) {
+    if (user == null) return const SizedBox();
+
+    final List<Widget> buttons = [];
+
+    // 1. Actions CHEF ATELIER
+    if (user.role == UserRole.CHEF_ATELIER && demande.status == DemandeStatus.CREEE) {
+      buttons.add(_buildActionButton(
+        'VALIDER ATELIER', 
+        Colors.blue, 
+        () => _handleAction(context, ref, DemandeStatus.VALIDEE_ATELIER)
+      ));
+      buttons.add(const SizedBox(width: 12));
+      buttons.add(_buildActionButton(
+        'REJETER', 
+        Colors.red, 
+        () => _handleAction(context, ref, DemandeStatus.REJETEE, needsReason: true)
+      ));
+    }
+
+    // 2. Actions DIRECTEUR
+    if (user.role == UserRole.DIRECTEUR) {
+      if (demande.status == DemandeStatus.VALIDEE_ATELIER) {
+        buttons.add(_buildActionButton(
+          'VALIDER DIRECTION', 
+          Colors.indigo, 
+          () => _handleAction(context, ref, DemandeStatus.VALIDEE_DIRECTION)
+        ));
+        buttons.add(const SizedBox(width: 12));
+        buttons.add(_buildActionButton(
+          'GÉNÉRER COUPON', 
+          Colors.purple, 
+          () => _handleAction(context, ref, DemandeStatus.BON_GENERE)
+        ));
+        buttons.add(const SizedBox(width: 12));
+        buttons.add(_buildActionButton(
+          'REJETER', 
+          Colors.red, 
+          () => _handleAction(context, ref, DemandeStatus.REJETEE, needsReason: true)
+        ));
+      } else if (demande.status == DemandeStatus.VALIDEE_DIRECTION) {
+        buttons.add(_buildActionButton(
+          'GÉNÉRER COUPON', 
+          Colors.purple, 
+          () => _handleAction(context, ref, DemandeStatus.BON_GENERE)
+        ));
+      }
+    }
+
+    if (buttons.isEmpty) return const SizedBox();
+
+    return SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      child: Row(children: buttons),
     );
   }
 
-  String _formatKey(String key) {
-    return key.replaceAll('_', ' ').toUpperCase();
+  Widget _buildActionButton(String label, Color color, VoidCallback onTap) {
+    return ElevatedButton(
+      onPressed: onTap,
+      style: ElevatedButton.styleFrom(
+        backgroundColor: color,
+        foregroundColor: Colors.white,
+        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+      ),
+      child: Text(label),
+    );
   }
 
-  void _showValidationDialog(BuildContext context, WidgetRef ref, bool approve) {
+  void _handleAction(BuildContext context, WidgetRef ref, DemandeStatus status, {bool needsReason = false}) {
     final reasonController = TextEditingController();
+    
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: Text(approve ? 'Approuver la demande' : 'Rejeter la demande'),
-        content: approve 
-            ? const Text('Voulez-vous valider cette demande ?')
-            : TextField(controller: reasonController, decoration: const InputDecoration(labelText: 'Motif du rejet')),
+        title: Text(status == DemandeStatus.REJETEE ? 'Rejeter la demande' : 'Confirmer l\'action'),
+        content: needsReason 
+            ? TextField(controller: reasonController, decoration: const InputDecoration(labelText: 'Motif du rejet'))
+            : Text('Voulez-vous passer cette demande au statut ${status.label} ?'),
         actions: [
           TextButton(onPressed: () => Navigator.pop(context), child: const Text('ANNULER')),
           ElevatedButton(
             onPressed: () async {
-              final success = await ref.read(demandeProvider.notifier).validateDemande(
+              final success = await ref.read(demandeProvider.notifier).processAction(
                 demande.id, 
-                isApproved: approve, 
-                rejectionReason: approve ? null : reasonController.text
+                status: status.name,
+                rejectionReason: needsReason ? reasonController.text : null,
               );
               if (success && context.mounted) {
                 Navigator.pop(context);
-                Navigator.pop(context);
+                ref.read(demandeProvider.notifier).fetchDemandeDetail(demande.id);
               }
             },
             child: const Text('CONFIRMER'),

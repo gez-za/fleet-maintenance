@@ -110,19 +110,47 @@ class DemandeNotifier extends Notifier<DemandeState> {
     }
   }
 
-  Future<bool> validateDemande(String id, {required bool isApproved, String? rejectionReason}) async {
+  Future<bool> processAction(String id, {
+    required String status,
+    String? rejectionReason,
+    String? bonNumber,
+    double? quantityGranted,
+    DateTime? bonDate,
+    DateTime? bonExpiryDate,
+  }) async {
     state = state.copyWith(isLoading: true, clearError: true);
     try {
-      await ref.read(demandeServiceProvider).validateDemande(
+      await ref.read(demandeServiceProvider).processAction(
         id, 
-        isApproved: isApproved, 
-        rejectionReason: rejectionReason
+        status: status,
+        rejectionReason: rejectionReason,
+        bonNumber: bonNumber,
+        quantityGranted: quantityGranted,
+        bonDate: bonDate,
+        bonExpiryDate: bonExpiryDate,
       );
-      await fetchDemandes(page: 1);
+      await refresh();
       return true;
     } catch (e) {
       state = state.copyWith(isLoading: false, error: e.toString());
       return false;
+    }
+  }
+
+  Future<void> fetchDemandeDetail(String id) async {
+    state = state.copyWith(isLoading: true, clearError: true);
+    try {
+      final demande = await ref.read(demandeServiceProvider).getDemandeById(id);
+      final index = state.demandes.indexWhere((d) => d.id == id);
+      if (index != -1) {
+        final newDemandes = [...state.demandes];
+        newDemandes[index] = demande;
+        state = state.copyWith(isLoading: false, demandes: newDemandes);
+      } else {
+        state = state.copyWith(isLoading: false, demandes: [...state.demandes, demande]);
+      }
+    } catch (e) {
+      state = state.copyWith(isLoading: false, error: e.toString());
     }
   }
 

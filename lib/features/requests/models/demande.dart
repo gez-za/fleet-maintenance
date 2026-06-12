@@ -1,5 +1,6 @@
 import '../../../core/models/demande_enums.dart';
 import '../../../core/models/user.dart';
+import '../../../core/utils/parser_utils.dart';
 import '../../vehicles/models/vehicle.dart';
 
 class Demande {
@@ -17,6 +18,13 @@ class Demande {
   final String? validatorId;
   final User? validator;
   final String? rejectionReason;
+  final double? estimatedAmount;
+  final int? currentKm;
+  final String? bonNumber;
+  final double? quantityEstimated;
+  final double? quantityGranted;
+  final DateTime? bonDate;
+  final DateTime? bonExpiryDate;
   final DateTime createdAt;
   final DateTime? validatedAt;
 
@@ -35,6 +43,13 @@ class Demande {
     this.validatorId,
     this.validator,
     this.rejectionReason,
+    this.estimatedAmount,
+    this.currentKm,
+    this.bonNumber,
+    this.quantityEstimated,
+    this.quantityGranted,
+    this.bonDate,
+    this.bonExpiryDate,
     required this.createdAt,
     this.validatedAt,
   });
@@ -42,7 +57,7 @@ class Demande {
   factory Demande.fromJson(Map<String, dynamic> json) => Demande(
     id: json['id'].toString(),
     type: DemandeType.values.firstWhere(
-      (e) => e.name == json['type'],
+      (e) => e.name == json['type'] || e.name == json['type_demande'],
       orElse: () => DemandeType.AUTRE,
     ),
     vehicleId: json['vehicule_id']?.toString(),
@@ -54,15 +69,22 @@ class Demande {
     ),
     status: DemandeStatus.values.firstWhere(
       (e) => e.name == json['statut'] || e.name == json['status'],
-      orElse: () => DemandeStatus.EN_ATTENTE,
+      orElse: () => DemandeStatus.CREEE,
     ),
-    justificatif: json['justificatif'],
+    justificatif: json['justificatif'] ?? json['piece_jointe_url'],
     details: json['details'] is Map<String, dynamic> ? json['details'] : {},
     requesterId: json['demandeur_id']?.toString() ?? '',
     requester: json['demandeur'] != null ? User.fromJson(json['demandeur']) : null,
     validatorId: json['validateur_id']?.toString(),
     validator: json['validateur'] != null ? User.fromJson(json['validateur']) : null,
     rejectionReason: json['motif_rejet'],
+    estimatedAmount: ParserUtils.parseDouble(json['montant_estime']),
+    currentKm: ParserUtils.parseInt(json['km_actuel']),
+    bonNumber: json['numero_bon'],
+    quantityEstimated: ParserUtils.parseDouble(json['quantite_estimee']),
+    quantityGranted: ParserUtils.parseDouble(json['quantite_accordee']),
+    bonDate: json['date_emission_bon'] != null ? DateTime.parse(json['date_emission_bon']) : null,
+    bonExpiryDate: json['date_validite_bon'] != null ? DateTime.parse(json['date_validite_bon']) : null,
     createdAt: json['created_at'] != null 
         ? DateTime.parse(json['created_at']) 
         : DateTime.now(),
@@ -106,7 +128,7 @@ class Depense {
     demandeId: json['demande_id']?.toString(),
     demande: json['demande'] != null ? Demande.fromJson(json['demande']) : null,
     label: json['libelle'] ?? json['label'] ?? '',
-    amount: (json['montant'] as num?)?.toDouble() ?? 0.0,
+    amount: ParserUtils.parseDouble(json['montant']) ?? 0.0,
     justificatif: json['justificatif'],
     date: json['date'] != null ? DateTime.parse(json['date']) : DateTime.now(),
     vehicleId: json['vehicule_id']?.toString(),

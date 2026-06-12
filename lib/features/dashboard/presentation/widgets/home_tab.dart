@@ -8,7 +8,9 @@ import '../../../../core/constants/app_colors.dart';
 import '../../../../core/constants/app_dimensions.dart';
 import '../../../../core/models/user.dart';
 import '../../../auth/presentation/providers/auth_notifier.dart';
+import '../../../faults/presentation/providers/fault_notifier.dart';
 import '../../../vehicles/presentation/providers/vehicle_notifier.dart';
+import '../../../vehicles/models/vehicle.dart';
 import '../../../users/presentation/providers/user_notifier.dart';
 import '../../../inventory/presentation/providers/inventory_providers.dart';
 
@@ -24,8 +26,22 @@ class _HomeTabState extends ConsumerState<HomeTab> {
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
+      final user = ref.read(authProvider).user;
+      final role = user?.role;
+
       ref.read(vehicleProvider.notifier).fetchVehicles();
-      ref.read(userListProvider.notifier).loadUsers();
+      
+      if (role == UserRole.ADMIN || role == UserRole.DIRECTEUR || role == UserRole.CHEF_ATELIER || role == UserRole.CHEF_CHAUFFEUR) {
+        ref.read(userListProvider.notifier).loadUsers();
+      }
+      
+      ref.read(faultProvider.notifier).fetchFaults();
+      
+      if (role == UserRole.ADMIN || role == UserRole.CHEF_ATELIER || role == UserRole.DIRECTEUR) {
+        // Materials/Inventory
+        ref.read(materielsProvider.notifier).refresh();
+        ref.read(stockAlertsProvider.notifier).refresh();
+      }
     });
   }
 
@@ -37,8 +53,18 @@ class _HomeTabState extends ConsumerState<HomeTab> {
 
     final vehicleState = ref.watch(vehicleProvider);
     final userState = ref.watch(userListProvider);
+    final faultState = ref.watch(faultProvider);
     final materielsState = ref.watch(materielsProvider);
     final alertsState = ref.watch(stockAlertsProvider);
+
+    // Pour les chauffeurs, on écoute l'identification du véhicule pour charger les alertes/pannes
+    if (role == UserRole.CHAUFFEUR) {
+      ref.listen(myVehicleProvider, (previous, next) {
+        if (previous == null && next != null) {
+          ref.read(faultProvider.notifier).fetchFaults(vehicleId: next.id);
+        }
+      });
+    }
 
     return SingleChildScrollView(
       padding: EdgeInsets.all(isMobile ? 16 : AppDimensions.space24),
@@ -48,7 +74,7 @@ class _HomeTabState extends ConsumerState<HomeTab> {
           if (isMobile) const SizedBox(height: 8),
           if (user != null) _buildWelcomeHeader(user),
           const SizedBox(height: 24),
-          _buildSummaryCards(role, isMobile, vehicleState, userState, materielsState, alertsState),
+          _buildSummaryCards(user, role, isMobile, vehicleState, userState, faultState, materielsState, alertsState),
           const SizedBox(height: 32),
           _buildQuickActions(context, role, isMobile),
         ],
@@ -72,8 +98,8 @@ class _HomeTabState extends ConsumerState<HomeTab> {
     );
   }
 
-  Widget _buildSummaryCards(UserRole role, bool isMobile, VehicleState vehicleState, UserListState userState, AsyncValue<List> materiels, AsyncValue<List> alerts) {
-    final cards = _getCardsForRole(role, vehicleState, userState, materiels, alerts);
+  Widget _buildSummaryCards(User? user, UserRole role, bool isMobile, VehicleState vehicleState, UserListState userState, FaultState faultState, AsyncValue<List> materiels, AsyncValue<List> alerts) {
+    final cards = _getCardsForRole(user, role, vehicleState, userState, faultState, materiels, alerts);
     
     if (isMobile) {
       return Column(
@@ -94,11 +120,12 @@ class _HomeTabState extends ConsumerState<HomeTab> {
     );
   }
 
-  List<Widget> _getCardsForRole(UserRole role, VehicleState vehicleState, UserListState userState, AsyncValue<List> materiels, AsyncValue<List> alerts) {
+  List<Widget> _getCardsForRole(User? user, UserRole role, VehicleState vehicleState, UserListState userState, FaultState faultState, AsyncValue<List> materiels, AsyncValue<List> alerts) {
     final totalVehicles = vehicleState.vehicles.length.toString();
     final totalUsers = userState.users.length.toString();
     final totalMateriels = (materiels.value?.length ?? 0).toString();
     final totalAlerts = (alerts.value?.length ?? 0).toString();
+    final totalFaults = faultState.faults.length.toString();
 
     switch (role) {
       case UserRole.ADMIN:
@@ -126,10 +153,31 @@ class _HomeTabState extends ConsumerState<HomeTab> {
           const _StatCard(title: 'Pièces', value: '0', icon: Icons.shopping_cart_outlined, color: AppColors.warning),
         ];
       case UserRole.CHAUFFEUR:
+        final myVehicle = ref.watch(myVehicleProvider) ?? const Vehicle(id: '', immatriculation: 'N/A', marque: '', modele: '', annee: 0, categorie: VehicleCategorie.SERVICE, statut: VehicleStatut.DISPONIBLE);
+        
         return [
-          const _StatCard(title: 'Mon Véhicule', value: 'N/A', icon: Icons.directions_car_rounded, color: AppColors.primary),
-          const _StatCard(title: 'Prochaine Main.', value: '--', icon: Icons.event_note_rounded, color: AppColors.warning),
-          const _StatCard(title: 'Alertes', value: '0', icon: Icons.warning_rounded, color: AppColors.danger),
+          _StatCard(
+            title: 'Mon Véhicule', 
+            value: myVehicle.immatriculation, 
+            icon: Icons.directions_car_rounded, 
+            color: AppColors.primary,
+            onTap: myVehicle.id.isNotEmpty ? () => Navigator.pushNamed(context, '/vehicles/detail', arguments: myVehicle.id) : null,
+          ),
+          const _StatCard(title: 'Prochaine Maintenance', value: '--', icon: Icons.event_note_rounded, color: AppColors.warning),
+          _StatCard(
+            title: 'Alertes', 
+            value: totalFaults, 
+            icon: Icons.warning_rounded, 
+            color: AppColors.danger,
+            onTap: () => Navigator.pushNamed(context, '/faults'),
+          ),
+        ];
+      case UserRole.CHEF_CHAUFFEUR:
+        final chauffeursCount = userState.users.where((u) => u.role == UserRole.CHAUFFEUR).length.toString();
+        return [
+          _StatCard(title: 'Chauffeurs', value: chauffeursCount, icon: Icons.badge_rounded, color: AppColors.primary),
+          _StatCard(title: 'Véhicules', value: totalVehicles, icon: Icons.directions_car_rounded, color: AppColors.primaryMid),
+          _StatCard(title: 'Alertes Pannes', value: totalFaults, icon: Icons.warning_amber_rounded, color: AppColors.danger),
         ];
     }
   }
@@ -167,6 +215,12 @@ class _HomeTabState extends ConsumerState<HomeTab> {
         return [
           _ActionData(title: 'Déclarer Panne', icon: Icons.report_problem_rounded, color: AppColors.danger, onTap: () => Navigator.pushNamed(context, '/faults/declare')),
           _ActionData(title: 'Carburant', icon: Icons.local_gas_station_rounded, color: AppColors.primary, onTap: () => Navigator.pushNamed(context, '/demandes/create')),
+        ];
+      case UserRole.CHEF_CHAUFFEUR:
+        return [
+          _ActionData(title: 'Affecter Chauffeur', icon: Icons.person_add_rounded, color: AppColors.primary, onTap: () => Navigator.pushNamed(context, '/vehicles')),
+          _ActionData(title: 'Déclarer Panne', icon: Icons.report_problem_rounded, color: AppColors.danger, onTap: () => Navigator.pushNamed(context, '/faults/declare')),
+          _ActionData(title: 'Liste Chauffeurs', icon: Icons.people_outline_rounded, color: AppColors.primaryMid, onTap: () => Navigator.pushNamed(context, '/users')),
         ];
       case UserRole.TECHNICIEN:
         return [
@@ -242,46 +296,52 @@ class _StatCard extends StatelessWidget {
   final String value;
   final IconData icon;
   final Color color;
+  final VoidCallback? onTap;
 
   const _StatCard({
     required this.title,
     required this.value,
     required this.icon,
     required this.color,
+    this.onTap,
   });
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: AppColors.divider),
-        boxShadow: [AppColors.cardShadow],
-      ),
-      child: Row(
-        children: [
-          Container(
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: color.withOpacity(0.1),
-              borderRadius: BorderRadius.circular(12),
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(16),
+      child: Container(
+        padding: const EdgeInsets.all(20),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: AppColors.divider),
+          boxShadow: [AppColors.cardShadow],
+        ),
+        child: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: color.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Icon(icon, color: color, size: 26),
             ),
-            child: Icon(icon, color: color, size: 26),
-          ),
-          const SizedBox(width: 16),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(title, style: const TextStyle(color: AppColors.textSecondary, fontSize: 12)),
-                const SizedBox(height: 4),
-                Text(value, style: const TextStyle(color: AppColors.textPrimary, fontSize: 20, fontWeight: FontWeight.bold)),
-              ],
+            const SizedBox(width: 16),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(title, style: const TextStyle(color: AppColors.textSecondary, fontSize: 12)),
+                  const SizedBox(height: 4),
+                  Text(value, style: const TextStyle(color: AppColors.textPrimary, fontSize: 20, fontWeight: FontWeight.bold)),
+                ],
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }

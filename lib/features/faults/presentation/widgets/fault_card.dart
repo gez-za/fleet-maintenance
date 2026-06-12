@@ -63,21 +63,39 @@ class FaultCard extends StatelessWidget {
                     ),
                     const SizedBox(height: AppDimensions.space4),
                     Text(
+                      '${fault.vehicle?.marque ?? ""} ${fault.vehicle?.modele ?? ""}',
+                      style: const TextStyle(
+                        color: AppColors.textSecondary,
+                        fontSize: AppDimensions.fontXS,
+                      ),
+                    ),
+                    const SizedBox(height: AppDimensions.space4),
+                    Text(
                       fault.description,
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
                       style: const TextStyle(
-                        color: AppColors.textSecondary,
+                        color: AppColors.textPrimary,
                         fontSize: AppDimensions.fontSM,
                       ),
                     ),
                     const SizedBox(height: AppDimensions.space12),
                     Row(
                       children: [
+                        const Icon(Icons.person_outline, size: 14, color: AppColors.textHint),
+                        const SizedBox(width: 4),
+                        Text(
+                          fault.reporter?.displayName ?? 'Inconnu',
+                          style: const TextStyle(
+                            color: AppColors.textHint,
+                            fontSize: AppDimensions.fontXS,
+                          ),
+                        ),
+                        const SizedBox(width: 12),
                         const Icon(Icons.access_time, size: 14, color: AppColors.textHint),
                         const SizedBox(width: 4),
                         Text(
-                          DateFormat('dd/MM/yyyy HH:mm').format(fault.createdAt),
+                          DateFormat('dd/MM').format(fault.createdAt),
                           style: const TextStyle(
                             color: AppColors.textHint,
                             fontSize: AppDimensions.fontXS,
@@ -159,7 +177,7 @@ class FaultCard extends StatelessWidget {
       case PanneStatus.DECLAREE:      return Colors.blue;
       case PanneStatus.VALIDEE:       return Colors.indigo;
       case PanneStatus.EN_DIAGNOSTIC: return Colors.orange;
-      case PanneStatus.EN_REPARATION: return Colors.purple;
+      case PanneStatus.EN_COURS: return Colors.purple;
       case PanneStatus.CLOTUREE:      return Colors.green;
       default:                        return Colors.grey;
     }

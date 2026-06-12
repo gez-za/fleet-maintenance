@@ -1,5 +1,6 @@
 import '../../../core/models/maintenance_enums.dart';
 import '../../../core/models/user.dart';
+import '../../../core/utils/parser_utils.dart';
 import '../../vehicles/models/vehicle.dart';
 
 class Fault {
@@ -41,33 +42,38 @@ class Fault {
     this.updatedAt,
   });
 
-  factory Fault.fromJson(Map<String, dynamic> json) => Fault(
-    id: json['id'].toString(),
-    vehicleId: json['vehicule_id']?.toString() ?? json['vehicleId']?.toString() ?? '',
-    vehicle: json['vehicule'] != null ? Vehicle.fromJson(json['vehicule']) : null,
-    description: json['description'] ?? '',
-    criticality: PanneCriticite.values.firstWhere(
-      (e) => e.name == json['criticite'] || e.name == json['criticality'],
-      orElse: () => PanneCriticite.MINEURE,
-    ),
-    status: PanneStatus.values.firstWhere(
-      (e) => e.name == json['statut'] || e.name == json['status'],
-      orElse: () => PanneStatus.DECLAREE,
-    ),
-    photo: json['photo'],
-    latitude: (json['gps_latitude'] as num?)?.toDouble() ?? (json['latitude'] as num?)?.toDouble(),
-    longitude: (json['gps_longitude'] as num?)?.toDouble() ?? (json['longitude'] as num?)?.toDouble(),
-    addressApprox: json['adresse_approx'] ?? json['addressApprox'],
-    reporterId: json['declarant_id']?.toString() ?? json['reporterId']?.toString() ?? '',
-    reporter: json['declarant'] != null ? User.fromJson(json['declarant']) : null,
-    technicianId: json['technicien_id']?.toString() ?? json['technicianId']?.toString(),
-    technician: json['technicien'] != null ? User.fromJson(json['technicien']) : null,
-    diagnostic: json['diagnostic'],
-    createdAt: json['created_at'] != null 
-        ? DateTime.parse(json['created_at']) 
-        : DateTime.now(),
-    updatedAt: json['updated_at'] != null ? DateTime.parse(json['updated_at']) : null,
-  );
+  factory Fault.fromJson(Map<String, dynamic> json) {
+    final vehicle = json['vehicule'] != null ? Vehicle.fromJson(json['vehicule']) : null;
+    return Fault(
+      id: json['id']?.toString() ?? '',
+      vehicleId: json['vehicule_id']?.toString() ?? 
+                 json['vehicleId']?.toString() ?? 
+                 vehicle?.id ?? '',
+      vehicle: vehicle,
+      description: json['description'] ?? '',
+      criticality: PanneCriticite.values.firstWhere(
+        (e) => e.name == json['criticite'] || e.name == json['criticality'],
+        orElse: () => PanneCriticite.MINEURE,
+      ),
+      status: PanneStatus.values.firstWhere(
+        (e) => e.name == json['statut'] || e.name == json['status'],
+        orElse: () => PanneStatus.DECLAREE,
+      ),
+      photo: json['photo_url'] ?? json['photo'],
+      latitude: ParserUtils.parseDouble(json['gps_latitude'] ?? json['latitude']),
+      longitude: ParserUtils.parseDouble(json['gps_longitude'] ?? json['longitude']),
+      addressApprox: json['adresse_approx'] ?? json['addressApprox'],
+      reporterId: json['declarant_id']?.toString() ?? json['reporterId']?.toString() ?? '',
+      reporter: json['declarant'] != null ? User.fromJson(json['declarant']) : null,
+      technicianId: json['technicien_id']?.toString() ?? json['technicianId']?.toString(),
+      technician: json['technicien'] != null ? User.fromJson(json['technicien']) : null,
+      diagnostic: json['diagnostic'],
+      createdAt: json['created_at'] != null 
+          ? (DateTime.tryParse(json['created_at'].toString()) ?? DateTime.now())
+          : DateTime.now(),
+      updatedAt: json['updated_at'] != null ? DateTime.tryParse(json['updated_at'].toString()) : null,
+    );
+  }
 
   Map<String, dynamic> toJson() => {
     'id': id,

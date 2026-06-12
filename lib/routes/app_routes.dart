@@ -59,6 +59,11 @@ class AppRouter {
     final user      = authState.user;
 
     switch (settings.name) {
+      case '/':
+        if (user == null) return _page(const LoginPage(), settings);
+        if (!user.isProfileComplete) return _page(const ProfilePage(), settings);
+        return _page(const DashboardPage(), settings);
+
     // ═══════════════════════════ AUTH ═══════════════════════════════════
 
       case '/profile':

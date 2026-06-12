@@ -19,7 +19,9 @@ class WorkOrderService {
 
   Future<WorkOrder> getWorkOrderById(String id) async {
     final response = await _api.get('${ApiEndpoints.ordresTravail}/$id');
-    return WorkOrder.fromJson(response.data['data']);
+    final dynamic data = response.data['data'];
+    final dynamic woData = data['ordre_travail'] ?? data['workOrder'] ?? data;
+    return WorkOrder.fromJson(woData);
   }
 
   Future<WorkOrder> createWorkOrder({

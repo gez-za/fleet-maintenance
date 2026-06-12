@@ -1,7 +1,10 @@
 import 'package:fleet_maintenance_app/routes/app_routes.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'features/auth/presentation/pages/login_page.dart';
+import 'features/auth/presentation/pages/profile_page.dart';
 import 'features/auth/presentation/providers/auth_notifier.dart';
+import 'features/dashboard/presentation/page/dashboard_page.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -18,41 +21,29 @@ class MyApp extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final authState = ref.watch(authProvider);
 
-    if (authState.isLoading) {
-      return MaterialApp(
-        debugShowCheckedModeBanner: false,
-        home: Scaffold(
-          body: Center(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                const Icon(Icons.directions_car_filled, size: 64, color: Color(0xFF1565C0)),
-                const SizedBox(height: 24),
-                const CircularProgressIndicator(),
-              ],
-            ),
-          ),
-        ),
-      );
-    }
-
     return MaterialApp(
       title: 'Fleet management',
       debugShowCheckedModeBanner: false,
       theme: _buildTheme(),
+      
+      home: authState.isLoading
+          ? Scaffold(
+              body: Center(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    const Icon(Icons.directions_car_filled, size: 64, color: Color(0xFF1565C0)),
+                    const SizedBox(height: 24),
+                    const CircularProgressIndicator(),
+                  ],
+                ),
+              ),
+            )
+          : (authState.isAuthenticated 
+              ? (authState.user!.isProfileComplete ? const DashboardPage() : const ProfilePage())
+              : const LoginPage()),
 
-      initialRoute: '/',
-
-      onGenerateRoute: (settings) {
-        if (settings.name == '/') {
-          if (authState.isAuthenticated) {
-            return AppRouter.generateRoute(const RouteSettings(name: '/dashboard'), ref);
-          } else {
-            return AppRouter.generateRoute(const RouteSettings(name: '/login'), ref);
-          }
-        }
-        return AppRouter.generateRoute(settings, ref);
-      },
+      onGenerateRoute: (settings) => AppRouter.generateRoute(settings, ref),
     );
   }
 

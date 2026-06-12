@@ -76,7 +76,8 @@ class AuthNotifier extends Notifier<AuthState> {
       if (token != null) {
         // Validation active du token avec /auth/me
         final response = await _api.get(ApiEndpoints.me);
-        final user = User.fromJson(response.data['data']);
+        final userData = response.data['data']['user'] ?? response.data['data'];
+        final user = User.fromJson(userData);
         
         // Mise à jour locale au cas où les infos ont changé
         await _storage.write(key: ApiConstants.userDataKey, value: jsonEncode(user.toJson()));

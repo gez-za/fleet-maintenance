@@ -1,4 +1,5 @@
 import 'package:equatable/equatable.dart';
+import '../../../core/utils/parser_utils.dart';
 
 class CatalogueItem extends Equatable {
   final String id;
@@ -20,7 +21,7 @@ class CatalogueItem extends Equatable {
       id: json['id'] ?? '',
       fournisseurId: json['fournisseur_id'] ?? '',
       designation: json['designation'] ?? '',
-      prixHT: (json['prix_ht'] ?? 0).toDouble(),
+      prixHT: ParserUtils.parseDouble(json['prix_ht']) ?? 0.0,
       delaiLivraison: json['delai_livraison'] ?? '',
     );
   }

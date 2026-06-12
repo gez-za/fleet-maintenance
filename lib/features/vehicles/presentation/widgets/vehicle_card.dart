@@ -120,7 +120,35 @@ class VehicleCard extends StatelessWidget {
                         ),
                       ),
                       const SizedBox(height: 8),
-                      VehicleStatusBadge(status: vehicle.statut),
+                      Row(
+                        children: [
+                          VehicleStatusBadge(status: vehicle.statut),
+                          if (vehicle.chauffeurName != null && vehicle.chauffeurName!.isNotEmpty) ...[
+                            const SizedBox(width: 8),
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                              decoration: BoxDecoration(
+                                color: AppColors.primary.withOpacity(0.1),
+                                borderRadius: BorderRadius.circular(4),
+                              ),
+                              child: Row(
+                                children: [
+                                  const Icon(Icons.person, size: 12, color: AppColors.primary),
+                                  const SizedBox(width: 4),
+                                  Text(
+                                    vehicle.chauffeurName!,
+                                    style: const TextStyle(
+                                      fontSize: 10,
+                                      fontWeight: FontWeight.bold,
+                                      color: AppColors.primary,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ],
+                      ),
                     ],
                   ),
                 ),

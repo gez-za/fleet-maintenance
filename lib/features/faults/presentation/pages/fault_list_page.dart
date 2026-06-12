@@ -4,6 +4,7 @@ import '../../../../core/constants/app_colors.dart';
 import '../../../../core/constants/app_dimensions.dart';
 import '../../../../core/models/user.dart';
 import '../../../auth/presentation/providers/auth_notifier.dart';
+import '../../../vehicles/presentation/providers/vehicle_notifier.dart';
 import '../providers/fault_notifier.dart';
 import '../widgets/fault_card.dart';
 
@@ -46,6 +47,15 @@ class _FaultListPageState extends ConsumerState<FaultListPage> {
   Widget build(BuildContext context) {
     final faultState = ref.watch(faultProvider);
     final user = ref.watch(authProvider).user;
+
+    // Si c'est un chauffeur, on écoute le chargement de son véhicule pour déclencher le fetch des pannes
+    if (user?.role == UserRole.CHAUFFEUR) {
+      ref.listen(myVehicleProvider, (previous, next) {
+        if (previous == null && next != null) {
+          ref.read(faultProvider.notifier).fetchFaults(page: 1, vehicleId: next.id);
+        }
+      });
+    }
 
     return Scaffold(
       backgroundColor: AppColors.background,

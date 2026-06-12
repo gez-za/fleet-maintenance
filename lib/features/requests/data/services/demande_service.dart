@@ -28,7 +28,9 @@ class DemandeService {
 
   Future<Demande> getDemandeById(String id) async {
     final response = await _api.get('${ApiEndpoints.demandes}/$id');
-    return Demande.fromJson(response.data['data']);
+    final dynamic data = response.data['data'];
+    final dynamic demandeData = data['demande'] ?? data;
+    return Demande.fromJson(demandeData);
   }
 
   Future<Demande> createDemande({
@@ -49,13 +51,21 @@ class DemandeService {
     return Demande.fromJson(response.data['data']);
   }
 
-  Future<Demande> validateDemande(String id, {
-    required bool isApproved,
+  Future<Demande> processAction(String id, {
+    required String status,
     String? rejectionReason,
+    String? bonNumber,
+    double? quantityGranted,
+    DateTime? bonDate,
+    DateTime? bonExpiryDate,
   }) async {
     final response = await _api.patch('${ApiEndpoints.demandes}/$id/validation', data: {
-      'approuve': isApproved,
+      'statut': status,
       'motif_rejet': rejectionReason,
+      'numero_bon': bonNumber,
+      'quantite_accordee': quantityGranted,
+      'date_emission_bon': bonDate?.toIso8601String(),
+      'date_validite_bon': bonExpiryDate?.toIso8601String(),
     });
     return Demande.fromJson(response.data['data']);
   }

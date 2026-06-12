@@ -13,7 +13,7 @@ class NavItem {
       NavItem(label: 'Véhicules',       icon: Icons.directions_car_rounded,   index: 1),
       NavItem(label: 'Pannes',          icon: Icons.warning_amber_rounded,    index: 2),
       NavItem(label: 'Atelier',         icon: Icons.build_rounded,            index: 3),
-      NavItem(label: 'Depenses',       icon: Icons.local_gas_station_rounded, index: 4),
+      NavItem(label: 'Demandes',       icon: Icons.local_gas_station_rounded, index: 4),
       NavItem(label: 'Chauffeurs',      icon: Icons.badge_rounded,            index: 5),
       NavItem(label: 'Matériels',       icon: Icons.inventory_2_rounded,      index: 6),
       NavItem(label: 'Fournisseurs',    icon: Icons.store_rounded,            index: 7),
@@ -34,6 +34,8 @@ class NavItem {
           return [0, 2, 3, 6].contains(item.index);
         case UserRole.CHAUFFEUR:
           return [0, 1, 2, 4].contains(item.index);
+        case UserRole.CHEF_CHAUFFEUR:
+          return [0, 1, 2, 4, 5].contains(item.index);
       }
     }).toList();
   }

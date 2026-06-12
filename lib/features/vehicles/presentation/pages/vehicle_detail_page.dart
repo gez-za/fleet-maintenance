@@ -3,35 +3,14 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/constants/app_dimensions.dart';
 import '../../../auth/presentation/providers/auth_notifier.dart';
+import '../../../users/presentation/providers/user_notifier.dart';
+import '../../../../core/models/user.dart';
 import '../../models/vehicle.dart';
+import '../../models/affectation.dart';
 import '../providers/vehicle_notifier.dart';
 import 'edit_vehicle_page.dart';
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Modèle affectation_chauffeur
-// ─────────────────────────────────────────────────────────────────────────────
-
-class AffectationChauffeur {
-  final String id;
-  final String chauffeurId;
-  final String nomComplet;
-  final String numeroPermis;
-  final String categoriePermis;
-  final DateTime dateDebut;
-  final DateTime? dateFin;
-  final bool actif;
-
-  const AffectationChauffeur({
-    required this.id,
-    required this.chauffeurId,
-    required this.nomComplet,
-    required this.numeroPermis,
-    required this.categoriePermis,
-    required this.dateDebut,
-    this.dateFin,
-    this.actif = true,
-  });
-}
+import '../../../faults/presentation/providers/fault_notifier.dart';
+import '../../../faults/presentation/widgets/fault_card.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Page principale
@@ -49,12 +28,32 @@ class VehicleDetailPage extends ConsumerStatefulWidget {
 class _VehicleDetailPageState extends ConsumerState<VehicleDetailPage>
     with SingleTickerProviderStateMixin {
   late TabController _tabController;
-  final List<AffectationChauffeur> _affectations = [];
+  List<AffectationChauffeur> _affectations = [];
+  bool _loadingAffectations = false;
 
   @override
   void initState() {
     super.initState();
     _tabController = TabController(length: 4, vsync: this);
+    Future.microtask(() {
+      ref.read(faultProvider.notifier).fetchFaults(vehicleId: widget.vehicleId);
+      _loadAffectations();
+    });
+  }
+
+  Future<void> _loadAffectations() async {
+    setState(() => _loadingAffectations = true);
+    try {
+      final data = await ref.read(vehicleServiceProvider).getAffectations(widget.vehicleId);
+      if (mounted) {
+        setState(() {
+          _affectations = data.map((e) => AffectationChauffeur.fromJson(e)).toList();
+          _loadingAffectations = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) setState(() => _loadingAffectations = false);
+    }
   }
 
   @override
@@ -192,9 +191,10 @@ class _VehicleDetailPageState extends ConsumerState<VehicleDetailPage>
 
   // ── Bottom sheet : affecter un chauffeur ─────────────────────────────────
   void _showAffectationDialog() {
-    final nomController    = TextEditingController();
-    final permisController = TextEditingController();
-    String categoriePermis = 'B';
+    final userListState = ref.read(userListProvider);
+    final chauffeurs = userListState.users.where((u) => u.role == UserRole.CHAUFFEUR).toList();
+    
+    String? selectedChauffeurId;
 
     showModalBottomSheet(
       context: context,
@@ -235,54 +235,39 @@ class _VehicleDetailPageState extends ConsumerState<VehicleDetailPage>
                   ),
                 ),
                 const SizedBox(height: 20),
-                TextField(
-                  controller: nomController,
-                  decoration: _inputDeco('Nom complet',
-                      hint: 'Ex : Jean-Pierre Mbarga'),
-                ),
-                const SizedBox(height: 14),
-                TextField(
-                  controller: permisController,
-                  decoration: _inputDeco('Numéro de permis',
-                      hint: 'Ex : CM-2019-004512'),
-                ),
-                const SizedBox(height: 14),
-                DropdownButtonFormField<String>(
-                  initialValue: categoriePermis,
-                  decoration: _inputDeco('Catégorie permis'),
-                  items: ['A', 'B', 'C', 'D', 'CE', 'DE']
-                      .map((c) => DropdownMenuItem(
-                    value: c,
-                    child: Text(c),
-                  ))
-                      .toList(),
-                  onChanged: (v) {
-                    if (v != null) setModal(() => categoriePermis = v);
-                  },
-                ),
+                if (chauffeurs.isEmpty)
+                  const Text('Aucun chauffeur disponible. Veuillez d\'abord créer des chauffeurs.',
+                    style: TextStyle(color: AppColors.danger))
+                else
+                  DropdownButtonFormField<String>(
+                    value: selectedChauffeurId,
+                    decoration: _inputDeco('Choisir un chauffeur'),
+                    items: chauffeurs.map((c) => DropdownMenuItem(
+                      value: c.uuid,
+                      child: Text(c.displayName),
+                    )).toList(),
+                    onChanged: (v) => setModal(() => selectedChauffeurId = v),
+                  ),
                 const SizedBox(height: 28),
                 SizedBox(
                   width: double.infinity,
                   height: AppDimensions.buttonHeight,
                   child: ElevatedButton(
-                    onPressed: () {
-                      if (nomController.text.trim().isEmpty ||
-                          permisController.text.trim().isEmpty) {
-                        return;
+                    onPressed: selectedChauffeurId == null ? null : () async {
+                      final success = await ref.read(vehicleProvider.notifier)
+                          .affecterChauffeur(widget.vehicleId, selectedChauffeurId!);
+                      
+                      if (success) {
+                        _loadAffectations();
+                        if (mounted) Navigator.pop(context);
+                      } else {
+                        final error = ref.read(vehicleProvider).error;
+                        if (mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(content: Text(error ?? 'Erreur lors de l\'affectation')),
+                          );
+                        }
                       }
-                      setState(() {
-                        _affectations.add(AffectationChauffeur(
-                          id: DateTime.now()
-                              .millisecondsSinceEpoch
-                              .toString(),
-                          chauffeurId: 'local',
-                          nomComplet: nomController.text.trim(),
-                          numeroPermis: permisController.text.trim(),
-                          categoriePermis: categoriePermis,
-                          dateDebut: DateTime.now(),
-                        ));
-                      });
-                      Navigator.pop(context);
                     },
                     style: ElevatedButton.styleFrom(
                       backgroundColor: AppColors.primary,
@@ -315,7 +300,9 @@ class _VehicleDetailPageState extends ConsumerState<VehicleDetailPage>
     final vehicleState = ref.watch(vehicleProvider);
     final user = ref.watch(authProvider).user;
     final isAdmin = user?.isAdmin ?? false;
-    final vehicle      = _resolveVehicle(vehicleState.vehicles);
+    final canAssign = user != null && (user.isAdmin || user.role == UserRole.CHEF_CHAUFFEUR);
+
+    final vehicle = _resolveVehicle(vehicleState.vehicles);
 
     if (vehicleState.isLoading) {
       return const Scaffold(
@@ -358,9 +345,8 @@ class _VehicleDetailPageState extends ConsumerState<VehicleDetailPage>
             pinned: true,
             backgroundColor: AppColors.primary,
             foregroundColor: AppColors.white,
-            // ── Menu actions : Modifier + Supprimer ─────────────────────
             actions: [
-              if (isAdmin)
+              if (canAssign)
                 IconButton(
                   icon: const Icon(Icons.edit_outlined),
                   tooltip: 'Modifier',
@@ -482,14 +468,10 @@ class _VehicleDetailPageState extends ConsumerState<VehicleDetailPage>
             _ChauffeursTab(
               affectations: _affectations,
               onAffecter: _showAffectationDialog,
-              isAdmin: isAdmin,
+              isAdmin: canAssign,
+              isLoading: _loadingAffectations,
             ),
-            const _EmptyModuleTab(
-              icon: Icons.build_outlined,
-              titre: 'Pannes',
-              message:
-              'Le module de gestion des pannes\nsera disponible prochainement.',
-            ),
+            _VehicleFaultsTab(vehicleId: vehicle.id),
             const _EmptyModuleTab(
               icon: Icons.local_gas_station_outlined,
               titre: 'Depenses',
@@ -603,15 +585,20 @@ class _ChauffeursTab extends StatelessWidget {
   final List<AffectationChauffeur> affectations;
   final VoidCallback onAffecter;
   final bool isAdmin;
+  final bool isLoading;
 
   const _ChauffeursTab({
     required this.affectations,
     required this.onAffecter,
     required this.isAdmin,
+    this.isLoading = false,
   });
 
   @override
   Widget build(BuildContext context) {
+    if (isLoading) {
+      return const Center(child: CircularProgressIndicator());
+    }
     final actifs = affectations.where((a) => a.actif).length;
 
     return Column(
@@ -924,6 +911,76 @@ class _AffectationCard extends StatelessWidget {
 
   String _fmt(DateTime d) =>
       '${d.day.toString().padLeft(2, '0')}/${d.month.toString().padLeft(2, '0')}/${d.year}';
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// ONGLET 3 — Pannes du véhicule
+// ─────────────────────────────────────────────────────────────────────────────
+
+class _VehicleFaultsTab extends ConsumerWidget {
+  final String vehicleId;
+
+  const _VehicleFaultsTab({required this.vehicleId});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final faultState = ref.watch(faultProvider);
+    final vehicleFaults = faultState.faults.where((f) => f.vehicleId == vehicleId).toList();
+
+    if (faultState.isLoading && vehicleFaults.isEmpty) {
+      return const Center(child: CircularProgressIndicator());
+    }
+
+    if (vehicleFaults.isEmpty) {
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.all(32),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Container(
+                width: 88, height: 88,
+                decoration: BoxDecoration(
+                  color: AppColors.primary.withOpacity(0.08),
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(Icons.check_circle_outline, size: 40, color: AppColors.primary),
+              ),
+              const SizedBox(height: 20),
+              const Text('Aucune panne',
+                  style: TextStyle(
+                      fontSize: AppDimensions.fontLG,
+                      fontWeight: FontWeight.bold,
+                      color: AppColors.textPrimary)),
+              const SizedBox(height: 10),
+              const Text('Aucune panne n\'a été déclarée pour ce véhicule.',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                      fontSize: AppDimensions.fontSM,
+                      color: AppColors.textSecondary,
+                      height: 1.6)),
+            ],
+          ),
+        ),
+      );
+    }
+
+    return ListView.builder(
+      padding: const EdgeInsets.all(16),
+      itemCount: vehicleFaults.length,
+      itemBuilder: (context, index) {
+        final fault = vehicleFaults[index];
+        return FaultCard(
+          fault: fault,
+          onTap: () => Navigator.pushNamed(
+            context,
+            '/faults/detail',
+            arguments: fault.id,
+          ),
+        );
+      },
+    );
+  }
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

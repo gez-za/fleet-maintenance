@@ -8,11 +8,12 @@ class FaultService {
 
   FaultService(this._api);
 
-  Future<Map<String, dynamic>> getFaults({int page = 1, int limit = 10, String? status}) async {
+  Future<dynamic> getFaults({int page = 1, int limit = 10, String? status, String? vehicleId}) async {
     final query = {
       'page': page,
       'limit': limit,
       if (status != null) 'statut': status,
+      if (vehicleId != null) 'vehicule_id': vehicleId,
     };
     final response = await _api.get(ApiEndpoints.pannes, query: query);
     return response.data['data'];
@@ -20,7 +21,9 @@ class FaultService {
 
   Future<Fault> getFaultById(String id) async {
     final response = await _api.get('${ApiEndpoints.pannes}/$id');
-    return Fault.fromJson(response.data['data']);
+    final dynamic data = response.data['data'];
+    final dynamic faultData = data['panne'] ?? data;
+    return Fault.fromJson(faultData);
   }
 
   Future<Fault> createFault({
@@ -55,7 +58,7 @@ class FaultService {
   }
 
   Future<Fault> addDiagnostic(String id, {required String diagnostic, required String status}) async {
-    final response = await _api.put('${ApiEndpoints.pannes}/$id/diagnostic', data: {
+    final response = await _api.patch('${ApiEndpoints.pannes}/$id/diagnostic', data: {
       'diagnostic': diagnostic,
       'statut': status,
     });

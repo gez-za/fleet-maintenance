@@ -1,4 +1,5 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../../../core/models/user.dart';
 import '../../../auth/presentation/providers/auth_notifier.dart';
 import '../../data/vehicle_service.dart';
 import '../../models/vehicle.dart';
@@ -48,6 +49,28 @@ final vehicleServiceProvider = Provider((ref) {
 
 final vehicleProvider = NotifierProvider<VehicleNotifier, VehicleState>(() {
   return VehicleNotifier();
+});
+
+final myVehicleProvider = Provider<Vehicle?>((ref) {
+  final user = ref.watch(authProvider).user;
+  if (user == null || user.role != UserRole.CHAUFFEUR) return null;
+  
+  final vehicles = ref.watch(vehicleProvider).vehicles;
+  if (vehicles.isEmpty) return null;
+  
+  try {
+    return vehicles.firstWhere(
+      (v) => v.affectationId == user.uuid, 
+      orElse: () => vehicles.firstWhere(
+        (v) => v.chauffeurName == user.displayName,
+        orElse: () => vehicles.firstWhere(
+          (v) => v.id == user.roleInfo?['vehicule_id']?.toString(),
+        ),
+      ),
+    );
+  } catch (_) {
+    return null;
+  }
 });
 
 class VehicleNotifier extends Notifier<VehicleState> {
@@ -129,6 +152,18 @@ class VehicleNotifier extends Notifier<VehicleState> {
       // Retire le véhicule localement sans refetch complet
       final updated = state.vehicles.where((v) => v.id != id).toList();
       state = state.copyWith(isLoading: false, vehicles: updated);
+      return true;
+    } catch (e) {
+      state = state.copyWith(isLoading: false, error: e.toString());
+      return false;
+    }
+  }
+
+  Future<bool> affecterChauffeur(String vehicleId, String chauffeurId) async {
+    state = state.copyWith(isLoading: true, clearError: true);
+    try {
+      await ref.read(vehicleServiceProvider).affecterChauffeur(vehicleId, chauffeurId);
+      await fetchVehicles();
       return true;
     } catch (e) {
       state = state.copyWith(isLoading: false, error: e.toString());

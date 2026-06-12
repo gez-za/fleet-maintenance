@@ -1,6 +1,7 @@
-import 'package:fleet_maintenance_app/core/services/api_service.dart';
-import 'package:fleet_maintenance_app/features/suppliers/models/supplier.dart';
-import 'package:fleet_maintenance_app/features/suppliers/models/catalogue_item.dart';
+import '../../../../core/constants/api_endpoints.dart';
+import '../../../../core/services/api_service.dart';
+import '../models/catalogue_item.dart';
+import '../models/supplier.dart';
 
 class SupplierService {
   final ApiService _apiService;
@@ -8,19 +9,19 @@ class SupplierService {
   SupplierService(this._apiService);
 
   Future<List<Supplier>> getFournisseurs() async {
-    final response = await _apiService.get('api/v1/fournisseurs');
+    final response = await _apiService.get(ApiEndpoints.fournisseurs);
     final List data = response.data['data'] ?? [];
     return data.map((e) => Supplier.fromJson(e)).toList();
   }
 
   Future<List<CatalogueItem>> getCatalogue(String supplierId) async {
-    final response = await _apiService.get('api/v1/fournisseurs/$supplierId/catalogue');
+    final response = await _apiService.get('${ApiEndpoints.fournisseurs}/$supplierId/catalogue');
     final List data = response.data['data'] ?? [];
     return data.map((e) => CatalogueItem.fromJson(e)).toList();
   }
 
   Future<CatalogueItem> addToCatalogue(String supplierId, CatalogueItem item) async {
-    final response = await _apiService.post('api/v1/fournisseurs/$supplierId/catalogue', data: item.toJson());
+    final response = await _apiService.post('${ApiEndpoints.fournisseurs}/$supplierId/catalogue', data: item.toJson());
     return CatalogueItem.fromJson(response.data['data']);
   }
 }

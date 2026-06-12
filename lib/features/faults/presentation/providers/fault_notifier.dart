@@ -1,5 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../../../core/models/user.dart';
 import '../../../auth/presentation/providers/auth_notifier.dart';
+import '../../../vehicles/presentation/providers/vehicle_notifier.dart';
 import '../../data/services/fault_service.dart';
 import '../../models/fault.dart';
 
@@ -53,14 +55,44 @@ class FaultNotifier extends Notifier<FaultState> {
   @override
   FaultState build() => FaultState();
 
-  Future<void> fetchFaults({int page = 1, String? status}) async {
+  Future<void> fetchFaults({int page = 1, String? status, String? vehicleId}) async {
+    final user = ref.read(authProvider).user;
+    
+    String? effectiveVehicleId = vehicleId;
+    if (user?.role == UserRole.CHAUFFEUR && effectiveVehicleId == null) {
+      // On tente de récupérer le véhicule du chauffeur depuis le provider dédié
+      final myVehicle = ref.read(myVehicleProvider);
+      effectiveVehicleId = myVehicle?.id;
+    }
+
+    // Les chauffeurs ne peuvent pas lister TOUTES les pannes, 
+    // mais ils peuvent voir celles de leur véhicule.
+    if (user?.role == UserRole.CHAUFFEUR && effectiveVehicleId == null) {
+      state = state.copyWith(isLoading: false);
+      return;
+    }
+
     state = state.copyWith(isLoading: true, clearError: true);
     try {
-      final data = await ref.read(faultServiceProvider).getFaults(page: page, status: status);
-      final List<dynamic> itemsJson = data['items'] ?? [];
-      final List<Fault> items = itemsJson.map((j) => Fault.fromJson(j)).toList();
+      final data = await ref.read(faultServiceProvider).getFaults(
+        page: page, 
+        status: status,
+        vehicleId: effectiveVehicleId,
+      );
       
-      final pagination = data['pagination'];
+      // Gestion robuste de la structure : List directe ou Map enveloppé
+      List<dynamic> itemsJson = [];
+      Map<String, dynamic>? pagination;
+
+      if (data is List) {
+        itemsJson = data;
+      } else if (data is Map) {
+        final pannesData = data['pannes'] ?? data;
+        itemsJson = pannesData['items'] ?? (pannesData is List ? pannesData : []);
+        pagination = pannesData['pagination'];
+      }
+
+      final List<Fault> items = itemsJson.map((j) => Fault.fromJson(j)).toList();
       
       state = state.copyWith(
         isLoading: false,
@@ -94,7 +126,7 @@ class FaultNotifier extends Notifier<FaultState> {
         longitude: longitude,
         addressApprox: addressApprox,
       );
-      await fetchFaults(page: 1);
+      await fetchFaults(page: 1, vehicleId: vehicleId);
       return true;
     } catch (e) {
       state = state.copyWith(isLoading: false, error: e.toString());
@@ -115,5 +147,36 @@ class FaultNotifier extends Notifier<FaultState> {
     }
   }
 
+  Future<bool> updateFaultStatus(String id, String status) async {
+    state = state.copyWith(isLoading: true, clearError: true);
+    try {
+      await ref.read(faultServiceProvider).updateStatus(id, status);
+      await fetchFaultDetail(id);
+      return true;
+    } catch (e) {
+      state = state.copyWith(isLoading: false, error: e.toString());
+      return false;
+    }
+  }
+
   Future<void> refresh() async => fetchFaults(page: 1);
+
+  Future<void> fetchFaultDetail(String id) async {
+    state = state.copyWith(isLoading: true, clearError: true);
+    try {
+      final fault = await ref.read(faultServiceProvider).getFaultById(id);
+      
+      // Mettre à jour la liste locale avec les infos complètes
+      final index = state.faults.indexWhere((f) => f.id == id);
+      if (index != -1) {
+        final newFaults = [...state.faults];
+        newFaults[index] = fault;
+        state = state.copyWith(isLoading: false, faults: newFaults);
+      } else {
+        state = state.copyWith(isLoading: false, faults: [...state.faults, fault]);
+      }
+    } catch (e) {
+      state = state.copyWith(isLoading: false, error: e.toString());
+    }
+  }
 }

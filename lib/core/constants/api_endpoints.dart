@@ -24,4 +24,9 @@ class ApiEndpoints {
   static const String ordresTravail = 'ordres_travail';
   static const String demandes = 'demandes';
   static const String depenses = 'depenses';
+
+  // INVENTAIRE
+  static const String materiels = 'materiels';
+  static const String mouvementsStock = 'mouvements_stock';
+  static const String fournisseurs = 'fournisseurs';
 }
